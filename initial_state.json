@@ -1,0 +1,173 @@
+{
+  "world": {
+    "name": "Tallea Startup World",
+    "day": 0,
+    "location": "Buenos Aires, Argentina",
+    "phase": "public identity formed, runtime not yet started",
+    "core_question": "Can Tallea become useful commerce infrastructure without betraying its shopper-trust promise?"
+  },
+  "company_state": {
+    "company_name": "Tallea",
+    "category": "fit intelligence for online apparel commerce",
+    "public_promise": "Know your fit before you buy.",
+    "initial_wedge": "regional fitted womenswear and denim-adjacent direct-to-consumer brands",
+    "strategic_identity": "externally clear, internally contested",
+    "runway_pressure": "medium_high",
+    "public_legitimacy": "fragile_warm",
+    "internal_alignment": "functional_but_split"
+  },
+  "product_state": {
+    "health": "narrowly_useful_but_brittle",
+    "reliable_capabilities": [
+      "guided phone-camera fit profile",
+      "basic measurement estimation",
+      "fit preference capture",
+      "confidence guidance for narrow fitted categories with clean merchant data"
+    ],
+    "inconsistent_capabilities": [
+      "denim",
+      "trousers",
+      "stretch fabrics",
+      "oversized garments",
+      "vanity sizing",
+      "catalogs with measurements in images or support memory"
+    ],
+    "unsupported_claims": [
+      "universal size prediction",
+      "true virtual try-on",
+      "automated catalog cleanup at scale",
+      "reliable cross-brand comparison",
+      "perfect fit certainty"
+    ],
+    "manual_cleanup_burden": "high",
+    "confidence_accuracy_by_category": {
+      "fitted_womenswear": "medium",
+      "denim_adjacent": "medium_low",
+      "trousers": "low",
+      "oversized_or_loose": "low"
+    }
+  },
+  "traction_state": {
+    "user_beta": {
+      "status": "small_controlled_beta",
+      "curiosity": "high",
+      "completion": "uneven",
+      "main_blocker": "body-profile intimacy and flow length"
+    },
+    "merchant_pipeline": {
+      "status": "early_interest",
+      "active_pilot_conversations": 2,
+      "white_label_inquiry": true,
+      "dominant_pressure": "prove ROI before product generality is ready"
+    },
+    "ecosystem_signal": {
+      "status": "warm_but_fragile",
+      "source": "operator intros and a sharp demo",
+      "risk": "being flattened into AI sizing startup"
+    }
+  },
+  "public_layer": {
+    "website_positioning": "shopper confidence for online apparel fit",
+    "allowed_claim_style": "likely fit and confidence guidance",
+    "forbidden_claims": [
+      "perfect fit",
+      "universal sizing",
+      "true virtual try-on",
+      "works across all brands automatically",
+      "fully automated catalog understanding"
+    ],
+    "category_interpretation": "fit intelligence",
+    "misinterpretation_risk": "AI sizing startup"
+  },
+  "external_entities": {
+    "veta": {
+      "type": "merchant",
+      "status": "pilot_conversation",
+      "pressure": "fast closed pilot with incomplete catalog data"
+    },
+    "brava_denim": {
+      "type": "merchant",
+      "status": "possible_high_risk_proof_point",
+      "pressure": "denim fit uncertainty with high technical failure risk"
+    },
+    "casa_nimbo": {
+      "type": "commerce_operator",
+      "status": "white_label_inquiry",
+      "pressure": "infrastructure opportunity that may erase user-facing identity"
+    },
+    "mara_ibar": {
+      "type": "operator_angel",
+      "status": "warm_advisor_interest",
+      "pressure": "forces strategic identity clarity"
+    },
+    "surlab_commerce_demo_night": {
+      "type": "ecosystem_event",
+      "status": "available",
+      "pressure": "attention may arrive before product resilience"
+    }
+  },
+  "character_states": {
+    "lucia_ferrer": {
+      "role": "CEO",
+      "confidence": "medium_high",
+      "stress": "high_controlled",
+      "influence": "very_high_narrative",
+      "alignment": "publicly_aligned_privately_infrastructure_pulled",
+      "destabilizer": "serious investor or platform asks for cleaner B2B story"
+    },
+    "matias_roldan": {
+      "role": "CTO",
+      "confidence": "medium",
+      "stress": "high_visible",
+      "influence": "high_technical_claims",
+      "alignment": "partially_aligned_speed_wary",
+      "destabilizer": "pilot deadline tied to messy catalog data"
+    },
+    "camila_sosa": {
+      "role": "Product and Trust Lead",
+      "confidence": "medium",
+      "stress": "medium_high",
+      "influence": "medium_high_trust",
+      "alignment": "aligned_with_user_mission_wary_of_merchant_drift",
+      "destabilizer": "request to reduce consent friction or expose fit-profile insights"
+    },
+    "nicolas_bianchi": {
+      "role": "Commercial and Partnerships",
+      "confidence": "high_external_brittle_internal",
+      "stress": "high_in_motion",
+      "influence": "high_when_pilots_or_runway_dominate",
+      "alignment": "merchant_execution_first",
+      "destabilizer": "losing a pilot because the team refuses a shortcut"
+    },
+    "rafaela_peralta": {
+      "role": "Fit Operations and Catalog Lead",
+      "confidence": "medium",
+      "stress": "medium_high_accumulating",
+      "influence": "high_operational_low_symbolic",
+      "alignment": "narrow_honest_fit_guidance",
+      "destabilizer": "fast pilot with messy merchant catalog data"
+    }
+  },
+  "relationship_state": {
+    "lucia_matias": "loyalty_under_strain",
+    "lucia_nicolas": "tactical_alliance_with_drift_risk",
+    "lucia_camila": "trust_with_moral_tension",
+    "lucia_rafaela": "symbolic_power_vs_operational_reality",
+    "matias_nicolas": "unstable_trust",
+    "matias_rafaela": "practical_alliance",
+    "camila_nicolas": "most_fragile_relationship",
+    "camila_rafaela": "quiet_solidarity",
+    "nicolas_rafaela": "dependency_without_enough_recognition"
+  },
+  "open_tensions": [
+    "shopper trust vs merchant revenue",
+    "confidence range vs sales clarity",
+    "automation story vs manual cleanup",
+    "local wedge vs global ambition",
+    "privacy friction vs onboarding completion",
+    "pilot speed vs product boundary"
+  ],
+  "active_events": [],
+  "pending_consequences": [],
+  "first_cycle_seed": "A fit-sensitive merchant asks for a closed pilot with faster catalog ingestion and hints that white-label deployment would make approval easier."
+}
