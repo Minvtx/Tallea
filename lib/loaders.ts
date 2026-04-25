@@ -25,6 +25,7 @@ export const RUNTIME_FOUNDATION_PATH = path.join(RUNTIME_DIR, "runtime_foundatio
 export const CYCLE_RULES_PATH = path.join(RUNTIME_DIR, "cycle_generation_rules.md");
 export const EVENT_TYPES_PATH = path.join(RUNTIME_DIR, "event_types.md");
 export const STATE_SCHEMA_PATH = path.join(RUNTIME_DIR, "state_schema.md");
+export const WORLD_RULES_PATH = path.join(CANON_DIR, "world_rules.md");
 
 // ---------------------------------------------------------------------------
 // Low-level helpers
@@ -204,6 +205,9 @@ export function loadStateSchema(): string {
 }
 export function loadFirstCycleSeed(): string {
   return readMd(FIRST_CYCLE_SEED_PATH);
+}
+export function loadWorldRules(): string {
+  return readMd(WORLD_RULES_PATH);
 }
 
 // ---------------------------------------------------------------------------

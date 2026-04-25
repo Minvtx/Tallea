@@ -63,14 +63,26 @@ export function deriveProjection(state: WorldState): SiteProjection {
   ];
 
   // Bonus claims: only when the pipeline reports a real live pilot AND the
-  // product is healthy enough to honestly back the claim.
+  // product is healthy enough to honestly back the claim AND the system is
+  // not currently hiding operational debt. If manual cleanup is at the
+  // `unsustainable` rung, the company is shipping by burning out one person;
+  // any public confidence claim is overstatement until that resolves.
   const bonus_claims: string[] = [];
   const productOk =
     health === "pilot_ready" || health === "narrowly_useful_but_brittle";
-  if (productOk && hasLivePilot && pilots >= 1) {
+  const cleanupOk = state.product_state.manual_cleanup_burden !== "unsustainable";
+  // "Small number of regional apparel brands" implies plural; require at
+  // least two live pilots (not just two conversations) before claiming it.
+  if (productOk && cleanupOk && hasLivePilot && pilots >= 2) {
     bonus_claims.push("Live with a small number of regional apparel brands.");
   }
-  if (productOk && hasLivePilot && legitimacy === "rising" && pilots >= 2) {
+  if (
+    productOk &&
+    cleanupOk &&
+    hasLivePilot &&
+    legitimacy === "rising" &&
+    pilots >= 3
+  ) {
     bonus_claims.push("Active fit-confidence pilots with fitted-apparel partners.");
   }
 

@@ -82,3 +82,37 @@ Query longer lore files only when a cycle needs deeper detail.
 Generate cycles where external opportunity exposes internal disagreement.
 Good cycles should change state, leave residue, and preserve unresolved strategic identity.
 
+## Realism Guardrails
+This world runs in startup time, not story time. One cycle is one in-universe day in a five-person Argentine startup with finite runway, narrow product reach, and a small early network.
+
+The system should refuse, downscale, or stretch across multiple cycles any outcome that would not realistically fit in a single day at this stage:
+
+- **Requires multiple cycles of buildup:**
+  - Going from interest to a signed pilot.
+  - Moving public legitimacy from `cold` or `fragile_warm` to `rising`.
+  - Closing or formalizing a white-label deal.
+  - A team fracture, not just a tense meeting.
+  - Repairing a relationship that has been openly strained.
+  - A merchant moving from active pilot to paid pilot.
+  - A platform actor going from inquiry to formal integration.
+
+- **Should usually be internal before public:**
+  - Strategy doubts.
+  - Trust strain.
+  - Manual cleanup taking over operations.
+  - Confidence drops in a garment category.
+
+- **Should never happen in one cycle without explicit prior signal:**
+  - Press explosion or viral attention.
+  - Big fundraising or acquisition signal.
+  - Major platform partnership.
+  - Loss of a pilot the team did not yet know was at risk.
+  - Permanent damage to the user-trust position from a single event.
+
+- **Pressure usually accumulates:**
+  - Most cycles should leave the world slightly heavier, not lighter.
+  - Tensions should persist across cycles unless a cycle explicitly works to repair them.
+  - Pending consequences should compound until one is activated by a triggering event.
+
+When in doubt, prefer the smaller, more constrained version of the event. A signal is more honest than a result.
+

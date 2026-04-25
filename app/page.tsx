@@ -198,9 +198,9 @@ export default async function HomePage() {
             team can actually act on.
           </h2>
           <p className="text-[14px] text-muted mt-4 leading-relaxed max-w-xl">
-            Tallea is currently piloting with regional fitted-apparel and
-            denim-adjacent brands. Pilots are scoped, time-boxed, and start with
-            categories where confidence is highest.
+            {projection.bonus_claims.length > 0
+              ? "Tallea is piloting with regional fitted-apparel and denim-adjacent brands. Pilots are scoped, time-boxed, and start with categories where confidence is highest."
+              : "Tallea is opening a small set of scoped, time-boxed pilots with regional fitted-apparel and denim-adjacent brands. Pilots start with categories where confidence is highest."}
           </p>
           <Link
             href="mailto:pilots@tallea.example"

@@ -21,11 +21,13 @@ import type {
 import {
   loadCurrentWorldState,
   loadCycleRules,
+  loadEventTypes,
   loadFirstCycleSeed,
   loadInitialState,
   loadRuntimeFoundation,
   loadStateSchema,
   loadTimeline,
+  loadWorldRules,
 } from "@/lib/loaders";
 import { applyAndPersistCycle, writeCycleOutput } from "@/lib/state";
 import { deriveProjection } from "@/lib/publisher";
@@ -39,6 +41,8 @@ export interface CycleContext {
   runtimeFoundation: string;
   cycleRules: string;
   stateSchema: string;
+  eventTypes: string;
+  worldRules: string;
   recentTimeline: TimelineEvent[];
   firstCycleSeed?: string;
 }
@@ -50,6 +54,8 @@ export function buildCycleContext(state: WorldState): CycleContext {
     runtimeFoundation: loadRuntimeFoundation(),
     cycleRules: loadCycleRules(),
     stateSchema: loadStateSchema(),
+    eventTypes: loadEventTypes(),
+    worldRules: loadWorldRules(),
     recentTimeline: recent,
     firstCycleSeed: state.world.day === 0 ? loadFirstCycleSeed() : undefined,
   };
@@ -168,8 +174,14 @@ async function generateWithAI(ctx: CycleContext): Promise<CycleOutput> {
     "## Runtime Foundation",
     ctx.runtimeFoundation,
     "",
+    "## World Rules (realism canon)",
+    ctx.worldRules,
+    "",
     "## Cycle Generation Rules",
     ctx.cycleRules,
+    "",
+    "## Event Types (canonical event catalog)",
+    ctx.eventTypes,
     "",
     "## State Schema",
     ctx.stateSchema,
@@ -185,7 +197,17 @@ async function generateWithAI(ctx: CycleContext): Promise<CycleOutput> {
       ? "\n## Day 0 Seed (use this for the first cycle)\n" + ctx.firstCycleSeed
       : "",
     "",
-    "Generate exactly one cycle. The state_updates delta must touch at least one character and at least one strategic field. Add at least one pending_consequence unless none would be honest.",
+    "## Scale and Pacing Constraints (must be honored)",
+    "- One cycle equals one in-universe day at a five-person Buenos Aires apparel-fit startup with finite runway and a small early network.",
+    "- Most cycles should advance a thread, not conclude one.",
+    "- Public narrative lags internal state. A single conversation, recommendation, or mention should not push public_legitimacy more than one step.",
+    "- Big outcomes require buildup. A signed pilot follows pilot conversations. A press explosion follows a smaller mention. A platform deal follows an inquiry.",
+    "- Pressure usually accumulates rather than resolves. Most cycles should leave at least one tension worse than they found it.",
+    "- Forbidden single-cycle moves unless the recent timeline explicitly built up to them: instant signed paid pilots, public_legitimacy jumps of more than one step, runway_pressure jumps of more than one step, internal_alignment jumps of more than one step, press explosions, acquisition rumors, large fundraising, full repair of openly-strained relationships.",
+    "- When in doubt, prefer the smaller, more constrained version of the event. A signal is more honest than a result.",
+    "- Before finalizing the cycle, ask yourself: could this realistically happen in one day given Tallea's current size, runway, network, and stage? What is still only a signal, not a result? What changed internally even though the public site should not change yet?",
+    "",
+    "Generate exactly one cycle. The state_updates delta must touch at least one character and at least one strategic field. Add at least one pending_consequence unless none would be honest. Do not move any qualitative ladder by more than one step in a single cycle. The deterministic apply layer will clamp larger jumps anyway, so producing them only wastes the cycle.",
   ].join("\n");
 
   const result = await generateObject({
@@ -210,7 +232,8 @@ type EventKind =
   | "catalog_mess"
   | "product_claim"
   | "white_label"
-  | "internal_repair";
+  | "internal_repair"
+  | "trust_friction";
 
 const KIND_TITLES: Record<EventKind, string> = {
   merchant_pilot: "Veta says yes, with a deadline",
@@ -218,6 +241,7 @@ const KIND_TITLES: Record<EventKind, string> = {
   product_claim: "A newsletter calls Tallea 'AI sizing'",
   white_label: "Casa Nimbo wants Tallea behind their brand",
   internal_repair: "The team finally says it out loud",
+  trust_friction: "Beta users hesitate at the body-profile flow",
 };
 
 /**
@@ -265,8 +289,12 @@ function pickEventKind(state: WorldState, recent: TimelineEvent[]): EventKind {
   }
 
   // Rotation, also skipping lastKind so back-to-back duplicates never happen.
+  // `trust_friction` is included so the world has a canonical low-stakes,
+  // internal-only beat (Camila empowered, no public-facing change). This
+  // models the runtime rule "internal change before public change".
   const rot: EventKind[] = [
     "merchant_pilot",
+    "trust_friction",
     "internal_repair",
     "product_claim",
     "catalog_mess",
@@ -283,6 +311,25 @@ function generateMock(ctx: CycleContext): CycleOutput {
 
   switch (kind) {
     case "merchant_pilot": {
+      // Realistic progression: a single cycle of "merchant says yes" should
+      // move the pipeline forward by one stage at most. Going from
+      // `early_interest` directly to `active_pilot` skips the
+      // `pilot_conversation` stage that the type system already encodes.
+      const currentPipeline = state.traction_state.merchant_pipeline.status;
+      const nextPipeline =
+        currentPipeline === "early_interest" || currentPipeline === "none"
+          ? "pilot_conversation"
+          : currentPipeline === "pilot_conversation"
+            ? "active_pilot"
+            : currentPipeline;
+
+      // Cleanup burden should only escalate, never quietly downgrade. If we
+      // were already at `unsustainable`, a new pilot does not magically reduce
+      // the backlog.
+      const currentCleanup = state.product_state.manual_cleanup_burden;
+      const nextCleanup =
+        currentCleanup === "unsustainable" ? "unsustainable" : "high";
+
       const consequence: PendingConsequence = {
         source_event_id: cycleId,
         description:
@@ -295,12 +342,12 @@ function generateMock(ctx: CycleContext): CycleOutput {
       const delta: WorldStateDelta = {
         traction_state: {
           merchant_pipeline: {
-            status: "active_pilot",
+            status: nextPipeline,
             active_pilot_conversations:
               state.traction_state.merchant_pipeline.active_pilot_conversations + 1,
           },
         },
-        product_state: { manual_cleanup_burden: "high" },
+        product_state: { manual_cleanup_burden: nextCleanup },
         external_entities: {
           veta: { status: "active_pilot", pressure: "tighter scope, real deadline" },
         },
@@ -432,8 +479,22 @@ function generateMock(ctx: CycleContext): CycleOutput {
     }
 
     case "product_claim": {
+      // A single newsletter mention should move public_legitimacy at most one
+      // step up from its current rung, and only if there is somewhere to go.
+      // Going from `cold` or `damaged` directly to `rising` would be a leap
+      // that the canon "what changes slowly" rules forbid.
+      const currentLegitimacy = state.company_state.public_legitimacy;
+      const stepUp: Record<typeof currentLegitimacy, typeof currentLegitimacy> = {
+        damaged: "cold",
+        cold: "fragile_warm",
+        fragile_warm: "rising",
+        rising: "overexposed",
+        overexposed: "overexposed",
+      };
+      const nextLegitimacy = stepUp[currentLegitimacy];
+
       const delta: WorldStateDelta = {
-        company_state: { public_legitimacy: "rising" },
+        company_state: { public_legitimacy: nextLegitimacy },
         public_layer: {
           category_interpretation: "AI sizing",
           misinterpretation_risk: "the press flattens fit intelligence into AI sizing",
@@ -577,10 +638,104 @@ function generateMock(ctx: CycleContext): CycleOutput {
       };
     }
 
+    case "trust_friction": {
+      // Canonical low-stakes, internal-only beat. Empowers Camila, moves
+      // user_beta.completion, leaves no public-facing change. Models the
+      // runtime rule "internal change before public change".
+      const delta: WorldStateDelta = {
+        traction_state: {
+          user_beta: {
+            completion: "uneven",
+            main_blocker: "body-profile intimacy and flow length",
+          },
+        },
+        character_states: {
+          camila_sosa: {
+            stress: "medium_high",
+            influence: "medium_high_trust",
+            last_major_shift:
+              "Walked the team through three drop-off points in the body-profile flow.",
+          },
+          nicolas_bianchi: {
+            last_major_shift:
+              "Pushed back on adding a consent screen before checkout for pilot users.",
+          },
+        },
+        relationship_state: {
+          camila_nicolas: "openly_strained",
+        },
+        open_tensions_added: ["consent friction vs onboarding completion"],
+        pending_consequences_added: [
+          {
+            source_event_id: cycleId,
+            description:
+              "If consent copy is rushed to lift completion, a future trust incident will trace back here.",
+            time_horizon: "medium",
+            domain: "trust",
+            status: "pending",
+          },
+        ],
+      };
+      return {
+        cycle_id: cycleId,
+        day,
+        title: "Beta users hesitate at the body-profile flow",
+        trigger:
+          "Camila brings completion data to the team: three quarters of beta users start the body-profile flow, fewer than half finish it, and the drop-off concentrates exactly where measurement language gets specific.",
+        primary_pressure:
+          "Trust costs friction; friction costs completion.",
+        secondary_pressure:
+          "Nicolas wants completion to look better before the next merchant call.",
+        internal_translation:
+          "Camila refuses to call the consent screen 'overhead'. Nicolas calls it 'one obstacle too many'. Lucia stays quiet. Matias asks whether the model is even confident on the segments that do complete.",
+        decision_point:
+          "Trim the consent screen for the next pilot, or hold the line and accept the lower completion number for one more cycle.",
+        decision_made:
+          "Hold the line for one more cycle. Camila will rewrite the consent copy, not remove it.",
+        outcome:
+          "Nothing visible to the public changes. The user-trust posture is preserved at a measurable cost to short-term completion.",
+        residue:
+          "Camila and Nicolas now disagree out loud about how much friction the user is allowed to feel. The disagreement was previously polite.",
+        next_hooks: [
+          "Camila ships rewritten consent copy and completion does not improve",
+          "A merchant asks why beta completion is lower than they expected",
+          "Nicolas raises the friction question again at a more loaded moment",
+        ],
+        threads: [
+          {
+            thread_id: "user_trust",
+            title: "Body-profile trust and completion",
+            affected_characters: [
+              "camila_sosa",
+              "nicolas_bianchi",
+              "lucia_ferrer",
+              "matias_roldan",
+            ],
+            status: "developing",
+          },
+        ],
+        state_updates: delta,
+      };
+    }
+
     case "internal_repair":
     default: {
+      // A single non-agenda meeting should not collapse a fracture. Only
+      // step up by one rung, and never above `functional_but_split` (full
+      // alignment requires structural follow-through, not a conversation).
+      const currentAlignment = state.company_state.internal_alignment;
+      const repaired: typeof currentAlignment =
+        currentAlignment === "fractured"
+          ? "openly_split"
+          : currentAlignment === "openly_split"
+            ? "functional_but_split"
+            : currentAlignment;
+
       const delta: WorldStateDelta = {
-        company_state: { internal_alignment: "functional_but_split" },
+        company_state:
+          repaired !== currentAlignment
+            ? { internal_alignment: repaired }
+            : {},
         character_states: {
           lucia_ferrer: { last_major_shift: "Acknowledged the identity question publicly inside the team." },
           camila_sosa: { stress: "medium" },
