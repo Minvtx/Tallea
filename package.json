@@ -1,0 +1,36 @@
+{
+  "name": "tallea",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Tallea: a persistent simulated startup world.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Minvtx/Tallea.git"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "@ai-sdk/react": "^3.0.170",
+    "@tailwindcss/postcss": "^4.2.4",
+    "ai": "^6.0.168",
+    "next": "^16.2.4",
+    "postcss": "^8.5.10",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "tailwindcss": "^4.2.4",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^6.0.3"
+  }
+}
