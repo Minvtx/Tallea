@@ -94,16 +94,29 @@ function textClass(tone: Tone): string {
   return "text-muted";
 }
 
+/**
+ * For inverted scales (where "high" is bad — runway pressure, cleanup burden),
+ * pass inverse so positive↔critical are flipped. Warning stays the same.
+ */
+function flipTone(t: Tone): Tone {
+  if (t === "positive") return "critical";
+  if (t === "critical") return "positive";
+  return t;
+}
+
 export function StatusBadge({
   value,
   prefix,
+  inverse = false,
   className = "",
 }: {
   value: string;
   prefix?: string;
+  inverse?: boolean;
   className?: string;
 }) {
-  const tone = toneFor(value);
+  const baseTone = toneFor(value);
+  const tone = inverse ? flipTone(baseTone) : baseTone;
   const display = value.replaceAll("_", " ");
   return (
     <span className={`inline-flex items-center gap-2 ${className}`}>

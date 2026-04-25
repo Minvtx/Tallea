@@ -143,7 +143,7 @@ export default async function PulsePage() {
                 <StatusBadge value={world.company_state.strategic_identity} />
               </FieldRow>
               <FieldRow label="Runway">
-                <StatusBadge value={world.company_state.runway_pressure} />
+                <StatusBadge value={world.company_state.runway_pressure} inverse />
               </FieldRow>
               <FieldRow label="Public legitimacy">
                 <StatusBadge value={world.company_state.public_legitimacy} />
@@ -161,7 +161,7 @@ export default async function PulsePage() {
                 <StatusBadge value={world.product_state.health} />
               </FieldRow>
               <FieldRow label="Cleanup burden">
-                <StatusBadge value={world.product_state.manual_cleanup_burden} />
+                <StatusBadge value={world.product_state.manual_cleanup_burden} inverse />
               </FieldRow>
               <FieldRow label="Reliable categories">
                 <span className="tabular">
@@ -182,7 +182,7 @@ export default async function PulsePage() {
               <FieldRow label="Pipeline">
                 <StatusBadge value={world.traction_state.merchant_pipeline.status} />
               </FieldRow>
-              <FieldRow label="Active pilots">
+              <FieldRow label="Pilot conversations">
                 <span className="tabular">
                   {world.traction_state.merchant_pipeline.active_pilot_conversations}
                 </span>

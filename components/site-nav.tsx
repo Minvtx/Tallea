@@ -1,7 +1,6 @@
 import Link from "next/link";
 
-const ITEMS = [
-  { href: "/", label: "Tallea" },
+const NAV_LINKS = [
   { href: "/pulse", label: "Pulse" },
   { href: "/timeline", label: "Timeline" },
   { href: "/admin", label: "Admin" },
@@ -18,7 +17,7 @@ export function SiteNav() {
           Tallea
         </Link>
         <ul className="flex items-center gap-6">
-          {ITEMS.slice(1).map((item) => (
+          {NAV_LINKS.map((item) => (
             <li key={item.href}>
               <Link
                 href={item.href}

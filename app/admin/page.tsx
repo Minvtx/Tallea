@@ -107,7 +107,7 @@ export default async function AdminPage() {
                 <StatusBadge value={world.company_state.strategic_identity} />
               </FieldRow>
               <FieldRow label="Runway">
-                <StatusBadge value={world.company_state.runway_pressure} />
+                <StatusBadge value={world.company_state.runway_pressure} inverse />
               </FieldRow>
               <FieldRow label="Public legitimacy">
                 <StatusBadge value={world.company_state.public_legitimacy} />
@@ -115,7 +115,7 @@ export default async function AdminPage() {
               <FieldRow label="Internal alignment">
                 <StatusBadge value={world.company_state.internal_alignment} />
               </FieldRow>
-              <FieldRow label="Active pilots">
+              <FieldRow label="Pilot conversations">
                 <span className="tabular">
                   {world.traction_state.merchant_pipeline.active_pilot_conversations}
                 </span>

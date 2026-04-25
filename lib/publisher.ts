@@ -14,7 +14,13 @@ export function deriveProjection(state: WorldState): SiteProjection {
   const runway = state.company_state.runway_pressure;
   const legitimacy = state.company_state.public_legitimacy;
   const health = state.product_state.health;
+  const pipelineStatus = state.traction_state.merchant_pipeline.status;
   const pilots = state.traction_state.merchant_pipeline.active_pilot_conversations;
+  // Only count the pipeline as a real, claimable pilot once a merchant is
+  // actually live. `active_pilot_conversations` counts conversations, not
+  // signed pilots, so we must not derive public claims from it alone.
+  const hasLivePilot =
+    pipelineStatus === "active_pilot" || pipelineStatus === "paid_pilot";
 
   // Tone matrix
   let tone: SiteProjection["tone"] = "calm";
@@ -56,25 +62,24 @@ export function deriveProjection(state: WorldState): SiteProjection {
     "Fully automated catalog understanding.",
   ];
 
-  // Bonus claims: only when product is healthy and at least one real pilot exists
+  // Bonus claims: only when the pipeline reports a real live pilot AND the
+  // product is healthy enough to honestly back the claim.
   const bonus_claims: string[] = [];
   const productOk =
     health === "pilot_ready" || health === "narrowly_useful_but_brittle";
-  const legitOk =
-    legitimacy === "rising" ||
-    legitimacy === "fragile_warm" ||
-    legitimacy === "cold";
-  if (productOk && legitOk && pilots >= 1) {
+  if (productOk && hasLivePilot && pilots >= 1) {
     bonus_claims.push("Live with a small number of regional apparel brands.");
   }
-  if (productOk && legitimacy === "rising" && pilots >= 2) {
+  if (productOk && hasLivePilot && legitimacy === "rising" && pilots >= 2) {
     bonus_claims.push("Active fit-confidence pilots with fitted-apparel partners.");
   }
 
-  // CTA shifts based on traction and runway
+  // CTA: prefer the shopper invitation until a real pilot exists. We only
+  // flip to the merchant CTA when there is a live pilot or runway is forcing
+  // a B2B push, never on conversation count alone.
   let cta_label = "Request early access";
   let cta_intent: SiteProjection["cta_intent"] = "shopper";
-  if (pilots >= 2 || runway === "high" || runway === "critical") {
+  if (hasLivePilot || runway === "high" || runway === "critical") {
     cta_label = "Pilot inquiry for merchants";
     cta_intent = "merchant";
   } else if (tone === "constrained") {

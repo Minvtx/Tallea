@@ -212,36 +212,74 @@ type EventKind =
   | "white_label"
   | "internal_repair";
 
-function pickEventKind(state: WorldState): EventKind {
+const KIND_TITLES: Record<EventKind, string> = {
+  merchant_pilot: "Veta says yes, with a deadline",
+  catalog_mess: "The catalog arrives, and it is a mess",
+  product_claim: "A newsletter calls Tallea 'AI sizing'",
+  white_label: "Casa Nimbo wants Tallea behind their brand",
+  internal_repair: "The team finally says it out loud",
+};
+
+/**
+ * Detect which mock template was last used by matching the latest cycle's
+ * title. Returns null in AI mode (titles diverge) or when no cycle exists.
+ */
+function detectLastKind(recent: TimelineEvent[]): EventKind | null {
+  if (recent.length === 0) return null;
+  const last = recent[recent.length - 1];
+  for (const k of Object.keys(KIND_TITLES) as EventKind[]) {
+    if (last.title === KIND_TITLES[k]) return k;
+  }
+  return null;
+}
+
+function pickEventKind(state: WorldState, recent: TimelineEvent[]): EventKind {
   const day = state.world.day;
   if (day === 0) return "merchant_pilot";
 
+  const lastKind = detectLastKind(recent);
   const cleanup = state.product_state.manual_cleanup_burden;
   const legitimacy = state.company_state.public_legitimacy;
   const runway = state.company_state.runway_pressure;
   const wlInquiry = state.traction_state.merchant_pipeline.white_label_inquiry;
 
-  if (cleanup === "high" || cleanup === "unsustainable") return "catalog_mess";
-  if (legitimacy === "rising" || legitimacy === "overexposed")
+  // Priority overrides — but never repeat the kind that just ran.
+  if (
+    (cleanup === "high" || cleanup === "unsustainable") &&
+    lastKind !== "catalog_mess"
+  ) {
+    return "catalog_mess";
+  }
+  if (
+    (legitimacy === "rising" || legitimacy === "overexposed") &&
+    lastKind !== "product_claim"
+  ) {
     return "product_claim";
-  if (wlInquiry && (runway === "high" || runway === "medium_high"))
+  }
+  if (
+    wlInquiry &&
+    (runway === "high" || runway === "medium_high") &&
+    lastKind !== "white_label"
+  ) {
     return "white_label";
+  }
 
-  // rotate
+  // Rotation, also skipping lastKind so back-to-back duplicates never happen.
   const rot: EventKind[] = [
     "merchant_pilot",
     "internal_repair",
     "product_claim",
     "catalog_mess",
   ];
-  return rot[day % rot.length];
+  const filtered = lastKind ? rot.filter((k) => k !== lastKind) : rot;
+  return filtered[day % filtered.length];
 }
 
 function generateMock(ctx: CycleContext): CycleOutput {
   const state = ctx.state;
   const day = state.world.day + 1;
   const cycleId = `cycle_${String(day).padStart(3, "0")}`;
-  const kind = pickEventKind(state);
+  const kind = pickEventKind(state, ctx.recentTimeline);
 
   switch (kind) {
     case "merchant_pilot": {
