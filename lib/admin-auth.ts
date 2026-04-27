@@ -1,7 +1,7 @@
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-const ADMIN_COOKIE_NAME = "tallea_admin_secret";
+export const ADMIN_COOKIE_NAME = "tallea_admin_secret";
 
 function isProduction(): boolean {
   return process.env.VERCEL_ENV === "production";
@@ -12,7 +12,7 @@ export function isAdminSecretConfigured(): boolean {
 }
 
 export async function getAdminAccessStatus(
-  searchParams?: { admin_secret?: string },
+  _searchParams?: { admin_secret?: string },
 ): Promise<{
   authorized: boolean;
   protected: boolean;
@@ -30,18 +30,6 @@ export async function getAdminAccessStatus(
   const headerSecret = (await headers()).get("x-admin-secret");
   const cookieStore = await cookies();
   const cookieSecret = cookieStore.get(ADMIN_COOKIE_NAME)?.value;
-  const querySecret = searchParams?.admin_secret;
-
-  if (querySecret === secret) {
-    cookieStore.set(ADMIN_COOKIE_NAME, secret, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/admin",
-      maxAge: 60 * 60 * 24 * 30,
-    });
-    return { authorized: true, protected: true, unprotectedWarning: false };
-  }
 
   return {
     authorized: headerSecret === secret || cookieSecret === secret,
@@ -67,6 +55,10 @@ export async function guardAdminPage(searchParams?: {
   protected: boolean;
   unprotectedWarning: boolean;
 }> {
+  if (searchParams?.admin_secret) {
+    redirect(`/api/admin/login?admin_secret=${encodeURIComponent(searchParams.admin_secret)}`);
+  }
+
   const status = await getAdminAccessStatus(searchParams);
   if (!status.authorized) redirect("/");
   return {
