@@ -4,31 +4,38 @@
  * The timeline is one TimelineEvent per cycle — the headline.
  * The log is many WorldLogEntry per cycle — the fuller daily record.
  *
- * deriveBaselineLogEntries is deterministic and runs every cycle, in BOTH
- * mock and AI mode. Whatever the model attaches to CycleOutput.logEntries
- * is merged on top and tagged source: "model".
+ * Each entry is tagged with a `layer`:
+ *   - company:       inside Tallea
+ *   - around:        directly around Tallea (specific entities)
+ *   - ecosystem:     ambient world motion (market, category, regional)
+ *   - carry_forward: latent consequences / implications
  *
- * No second LLM call. No retrieval. No new system. Just a structured
- * pass over the CycleOutput we already have.
+ * The baseline derivation pivots away from the headline fields the
+ * timeline already shows (outcome, residue) and toward the *delta* — the
+ * actual state changes that did not make the headline. That is what stops
+ * the daybook from feeling like a vertical re-listing of the timeline.
+ *
+ * Whatever the model attaches to CycleOutput.logEntries is merged on top
+ * and tagged source: "model".
+ *
+ * No second LLM call. No retrieval. No new system.
  */
 
 import type {
+  CharacterState,
   CycleLogEntryInput,
   CycleOutput,
   WorldLogDomain,
   WorldLogEntry,
   WorldLogKind,
+  WorldLogLayer,
   WorldLogVisibility,
   WorldState,
   WorldStateDelta,
 } from "@/types/world";
 
 // ---------------------------------------------------------------------------
-// Heuristics: classify a free-text beat into a kind + visibility.
-//
-// Cheap keyword passes; conservative defaults. The point is to give the
-// daybook enough texture to distinguish a press beat from a team conversation
-// without pretending the classifier is perfect.
+// Heuristics: classify a free-text beat into a kind + visibility + layer.
 // ---------------------------------------------------------------------------
 
 const PRESS_HINTS = [
@@ -53,6 +60,7 @@ const MERCHANT_HINTS = [
   "white label",
   "platform",
   "brand",
+  "retailer",
 ];
 const PRODUCT_HINTS = [
   "catalog",
@@ -94,6 +102,14 @@ function classifyTriggerKind(text: string): WorldLogKind {
   return "conversation";
 }
 
+function classifyTriggerLayer(text: string): WorldLogLayer {
+  const t = lower(text);
+  // External-entity-driven triggers belong "around" the company.
+  if (any(t, MERCHANT_HINTS) || any(t, PRESS_HINTS)) return "around";
+  // Everything else (a team conversation, a product change) is company-internal.
+  return "company";
+}
+
 function classifyVisibility(
   text: string,
   fallback: WorldLogVisibility = "internal",
@@ -105,7 +121,7 @@ function classifyVisibility(
 }
 
 // ---------------------------------------------------------------------------
-// Helpers for picking actors from the cycle context
+// Helpers
 // ---------------------------------------------------------------------------
 
 function actorsFromThreads(cycle: CycleOutput): string[] {
@@ -120,123 +136,269 @@ function changedCharacterIds(delta: WorldStateDelta): string[] {
   return Object.keys(delta.character_states ?? {});
 }
 
-function deltaTouchesPublicSurface(delta: WorldStateDelta): boolean {
-  return (
-    !!delta.public_layer ||
-    delta.company_state?.public_legitimacy !== undefined ||
-    delta.traction_state?.ecosystem_signal !== undefined
-  );
+function humanizeKey(id: string): string {
+  return id
+    .split("_")
+    .map((w) => (w.length > 0 ? w[0].toUpperCase() + w.slice(1) : w))
+    .join(" ");
+}
+
+function describeEntityKind(type: string | undefined): string {
+  if (!type) return "Entity";
+  switch (type) {
+    case "merchant":
+      return "Merchant";
+    case "press":
+      return "Outlet";
+    case "competitor":
+      return "Competitor";
+    case "platform":
+      return "Platform";
+    case "investor":
+      return "Investor";
+    case "operator_angel":
+      return "Operator";
+    case "commerce_operator":
+      return "Operator";
+    case "ecosystem_event":
+      return "Ecosystem signal";
+    default:
+      return humanizeKey(type);
+  }
+}
+
+function entityLayer(type: string | undefined): WorldLogLayer {
+  // Press, competitors, platforms, investors and operators are the ambient
+  // ecosystem. Concrete merchants and named operators directly engaged are
+  // "around" the company.
+  if (!type) return "around";
+  switch (type) {
+    case "merchant":
+      return "around";
+    case "platform":
+    case "competitor":
+    case "investor":
+    case "ecosystem_event":
+    case "operator_angel":
+    case "commerce_operator":
+    case "press":
+      return "ecosystem";
+    default:
+      return "around";
+  }
+}
+
+function relationshipPair(key: string): string[] {
+  // relationship keys are like "matias_nicolas" or "lucia_camila".
+  return key.split("_").filter(Boolean);
 }
 
 // ---------------------------------------------------------------------------
 // Baseline derivation
 // ---------------------------------------------------------------------------
 
+interface BaselinePush {
+  kind: WorldLogKind;
+  layer: WorldLogLayer;
+  visibility: WorldLogVisibility;
+  summary: string;
+  actors?: string[];
+  domain?: WorldLogDomain;
+}
+
 /**
  * Produce a deterministic baseline set of log entries from a CycleOutput.
  *
- * These are the entries that would have been generated even if the model
- * attached nothing. They guarantee the daybook always has at least:
+ * Design intent: stop restating the timeline. Describe the *delta* the
+ * timeline summarizes but does not enumerate.
+ *
+ * Always emitted (anchors the day to the timeline):
  *   - the trigger of the day
- *   - the decision the team made
- *   - the residue it left behind
- *   - any new pending consequences
- *   - any public-facing shift that day
+ *   - the decision the team made (often invisible on the timeline)
+ *
+ * Conditionally emitted (from the actual state delta):
+ *   - one company entry per character whose `last_major_shift` was set
+ *   - one around entry per external entity touched in the delta
+ *   - one ecosystem entry per ecosystem_signal change
+ *   - one around/ecosystem entry per public_layer shift
+ *   - one company entry per relationship_state change
+ *   - one company entry if cleanup burden escalated to high/unsustainable
+ *   - one carry_forward entry per pending consequence added
+ *
+ * Outcome and residue are intentionally NOT duplicated here — the timeline
+ * already shows them. That was the main source of overlap.
  */
 export function deriveBaselineLogEntries(
   cycle: CycleOutput,
-  _prevState: WorldState,
+  prevState: WorldState,
 ): WorldLogEntry[] {
   const entries: WorldLogEntry[] = [];
   const delta = cycle.state_updates;
   const threadActors = actorsFromThreads(cycle);
 
   let idx = 0;
-  const push = (
-    kind: WorldLogKind,
-    visibility: WorldLogVisibility,
-    summary: string,
-    extras?: { actors?: string[]; domain?: WorldLogDomain },
-  ) => {
-    if (!summary || !summary.trim()) return;
+  const push = (e: BaselinePush) => {
+    const summary = (e.summary ?? "").trim();
+    if (!summary) return;
     entries.push({
       id: `${cycle.cycle_id}_log_${String(idx).padStart(2, "0")}`,
       cycle_id: cycle.cycle_id,
       day: cycle.day,
-      kind,
-      visibility,
-      summary: summary.trim(),
-      actors: extras?.actors && extras.actors.length > 0 ? extras.actors : undefined,
-      domain: extras?.domain,
+      kind: e.kind,
+      layer: e.layer,
+      visibility: e.visibility,
+      summary,
+      actors: e.actors && e.actors.length > 0 ? e.actors : undefined,
+      domain: e.domain,
       source: "derived",
     });
     idx += 1;
   };
 
-  // 1. Trigger of the day
-  push(
-    classifyTriggerKind(cycle.trigger),
-    classifyVisibility(cycle.trigger, "internal"),
-    cycle.trigger,
-    { actors: threadActors },
-  );
-
-  // 2. Decision made by the team — always internal, always anchored to threads
-  push("decision", "internal", cycle.decision_made, { actors: threadActors });
-
-  // 3. Outcome — visibility follows whether the public surface moved
-  push(
-    classifyTriggerKind(cycle.outcome),
-    deltaTouchesPublicSurface(delta)
-      ? "mixed"
-      : classifyVisibility(cycle.outcome, "internal"),
-    cycle.outcome,
-  );
-
-  // 4. Residue — internal by default; this is what the day leaves behind
-  push("internal_shift", "internal", cycle.residue, {
-    actors: changedCharacterIds(delta),
+  // 1. Main development of the day. Anchors the daybook to the timeline
+  //    without restating outcome+residue. Layer follows classification.
+  push({
+    kind: classifyTriggerKind(cycle.trigger),
+    layer: classifyTriggerLayer(cycle.trigger),
+    visibility: classifyVisibility(cycle.trigger, "internal"),
+    summary: cycle.trigger,
+    actors: threadActors,
   });
 
-  // 5. Public-layer or legitimacy shifts get their own dedicated public entry
-  if (deltaTouchesPublicSurface(delta)) {
+  // 2. The decision. Always company-internal. The timeline does not show
+  //    the decision text; this is genuinely additive.
+  push({
+    kind: "decision",
+    layer: "company",
+    visibility: "internal",
+    summary: cycle.decision_made,
+    actors: threadActors,
+  });
+
+  // 3. Per-character internal shifts. One entry per character whose
+  //    last_major_shift was rewritten this cycle. These are the kind of
+  //    "smaller beat" the timeline cannot fit.
+  for (const [charId, partial] of Object.entries(delta.character_states ?? {})) {
+    const shift = (partial as Partial<CharacterState>)?.last_major_shift;
+    if (!shift) continue;
+    push({
+      kind: "internal_shift",
+      layer: "company",
+      visibility: "internal",
+      summary: shift,
+      actors: [charId],
+    });
+  }
+
+  // 4. Relationship-state changes. Quiet two-person conversations the
+  //    timeline does not capture.
+  for (const [pairKey, value] of Object.entries(delta.relationship_state ?? {})) {
+    const people = relationshipPair(pairKey);
+    push({
+      kind: "conversation",
+      layer: "company",
+      visibility: "internal",
+      summary: `${people.map(humanizeKey).join(" and ")}: ${String(value).replaceAll("_", " ")}.`,
+      actors: people,
+    });
+  }
+
+  // 5. External entities touched in the delta. These are world-motion beats
+  //    the timeline does not enumerate. Layer depends on entity type.
+  for (const [entityId, partial] of Object.entries(delta.external_entities ?? {})) {
+    const prevEntity = prevState.external_entities[entityId];
+    const type =
+      (partial as { type?: string }).type ??
+      prevEntity?.type ??
+      undefined;
+    const status = (partial as { status?: string }).status;
+    const pressure = (partial as { pressure?: string }).pressure;
     const pieces: string[] = [];
-    if (delta.public_layer?.category_interpretation) {
-      pieces.push(
-        `Public framing drifts toward "${delta.public_layer.category_interpretation}".`,
-      );
-    }
-    if (delta.public_layer?.misinterpretation_risk) {
-      pieces.push(`Risk surfaced: ${delta.public_layer.misinterpretation_risk}.`);
-    }
-    if (delta.company_state?.public_legitimacy) {
-      pieces.push(
-        `Public legitimacy now reads as ${delta.company_state.public_legitimacy.replaceAll(
-          "_",
-          " ",
-        )}.`,
-      );
-    }
-    if (pieces.length > 0) {
-      push("press_signal", "public", pieces.join(" "));
-    }
+    if (status) pieces.push(`now ${String(status).replaceAll("_", " ")}`);
+    if (pressure) pieces.push(pressure);
+    const pretty = humanizeKey(entityId);
+    if (pieces.length === 0) continue;
+    const layer = entityLayer(type);
+    push({
+      kind: "external_entity_motion",
+      layer,
+      visibility: layer === "ecosystem" ? "public" : "mixed",
+      summary: `${describeEntityKind(type)} ${pretty}: ${pieces.join("; ")}.`,
+      actors: [entityId],
+    });
   }
 
-  // 6. Pending consequences added — one entry each, internal
+  // 6. Ecosystem signal change. Pure ambient world.
+  const eco = delta.traction_state?.ecosystem_signal;
+  if (eco && (eco.status || eco.source || eco.risk)) {
+    const pieces: string[] = [];
+    if (eco.status) pieces.push(`status reads ${String(eco.status).replaceAll("_", " ")}`);
+    if (eco.source) pieces.push(`source: ${eco.source}`);
+    if (eco.risk) pieces.push(`risk: ${eco.risk}`);
+    push({
+      kind: "market_drift",
+      layer: "ecosystem",
+      visibility: "public",
+      summary: `Ecosystem signal — ${pieces.join("; ")}.`,
+    });
+  }
+
+  // 7. Public-layer shift. The site does not change every cycle; when it
+  //    does, that is its own beat. Around-the-company by default; ecosystem
+  //    when the misinterpretation_risk is about category framing.
+  if (delta.public_layer) {
+    const pl = delta.public_layer;
+    const cat = pl.category_interpretation;
+    const risk = pl.misinterpretation_risk;
+    if (cat) {
+      push({
+        kind: "public_misreading",
+        layer: "ecosystem",
+        visibility: "public",
+        summary: `Public framing drifts toward "${cat}".`,
+      });
+    }
+    if (risk) {
+      push({
+        kind: "public_misreading",
+        layer: "ecosystem",
+        visibility: "public",
+        summary: `Misinterpretation risk surfaced: ${risk}.`,
+      });
+    }
+  }
+  if (delta.company_state?.public_legitimacy) {
+    push({
+      kind: "press_signal",
+      layer: "around",
+      visibility: "public",
+      summary: `Public legitimacy now reads as ${String(
+        delta.company_state.public_legitimacy,
+      ).replaceAll("_", " ")}.`,
+    });
+  }
+
+  // 8. Operational beat: cleanup burden escalated.
+  const burden = delta.product_state?.manual_cleanup_burden;
+  if (burden === "high" || burden === "unsustainable") {
+    push({
+      kind: "operational",
+      layer: "company",
+      visibility: "internal",
+      summary: `Manual catalog cleanup burden now sits at ${String(burden).replaceAll("_", " ")}.`,
+    });
+  }
+
+  // 9. Carry-forward / implications. Pending consequences are exactly that:
+  //    not "what happened today" but "what today changes next."
   for (const pc of delta.pending_consequences_added ?? []) {
-    push("consequence", "internal", pc.description, { domain: pc.domain });
-  }
-
-  // 7. Operational beat: cleanup burden escalated
-  if (delta.product_state?.manual_cleanup_burden) {
-    const burden = delta.product_state.manual_cleanup_burden;
-    if (burden === "high" || burden === "unsustainable") {
-      push(
-        "operational",
-        "internal",
-        `Manual catalog cleanup burden now sits at ${burden.replaceAll("_", " ")}.`,
-      );
-    }
+    push({
+      kind: "carry_forward",
+      layer: "carry_forward",
+      visibility: "internal",
+      summary: pc.description,
+      domain: pc.domain,
+    });
   }
 
   return entries;
@@ -246,10 +408,23 @@ export function deriveBaselineLogEntries(
 // Merging model-provided entries on top of baseline
 // ---------------------------------------------------------------------------
 
+function naiveOverlap(a: string, b: string): number {
+  const ta = new Set(a.toLowerCase().split(/\W+/).filter((t) => t.length > 3));
+  const tb = new Set(b.toLowerCase().split(/\W+/).filter((t) => t.length > 3));
+  if (ta.size === 0 || tb.size === 0) return 0;
+  let shared = 0;
+  for (const t of ta) if (tb.has(t)) shared += 1;
+  return shared / Math.min(ta.size, tb.size);
+}
+
 /**
  * Take baseline derived entries plus whatever the orchestrator attached
  * via CycleOutput.logEntries, assign canonical ids, and return the full
  * WorldLogEntry[] for this cycle.
+ *
+ * Dedup: we drop a model entry if it is a substring of a baseline entry
+ * or shares more than 70% of its content words with one. This keeps model
+ * entries that *enrich* and removes ones that merely paraphrase.
  */
 export function mergeCycleLogEntries(
   cycle: CycleOutput,
@@ -258,18 +433,26 @@ export function mergeCycleLogEntries(
   const merged = [...baseline];
   const inputs: CycleLogEntryInput[] = cycle.logEntries ?? [];
   let idx = baseline.length;
+
   for (const input of inputs) {
     const summary = (input.summary ?? "").trim();
     if (!summary) continue;
-    // Naive dedup: if a baseline entry already covers the same summary, skip.
-    if (merged.some((b) => b.summary.toLowerCase() === summary.toLowerCase())) {
-      continue;
-    }
+    const lower = summary.toLowerCase();
+
+    const isDup = merged.some((b) => {
+      const bl = b.summary.toLowerCase();
+      if (bl === lower) return true;
+      if (bl.includes(lower) || lower.includes(bl)) return true;
+      return naiveOverlap(bl, lower) > 0.7;
+    });
+    if (isDup) continue;
+
     merged.push({
       id: `${cycle.cycle_id}_log_${String(idx).padStart(2, "0")}`,
       cycle_id: cycle.cycle_id,
       day: cycle.day,
       kind: input.kind,
+      layer: input.layer,
       visibility: input.visibility,
       summary,
       actors: input.actors && input.actors.length > 0 ? input.actors : undefined,

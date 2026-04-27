@@ -1,0 +1,412 @@
+[
+  {
+    "id": "cycle_001_log_00",
+    "cycle_id": "cycle_001",
+    "day": 1,
+    "kind": "merchant_signal",
+    "visibility": "mixed",
+    "summary": "Veta agrees to a closed pilot on fitted tops and trousers, asking Tallea to handle catalog cleanup inside two weeks.",
+    "actors": [
+      "lucia_ferrer",
+      "nicolas_bianchi",
+      "matias_roldan",
+      "rafaela_peralta",
+      "camila_sosa"
+    ],
+    "source": "derived"
+  },
+  {
+    "id": "cycle_001_log_01",
+    "cycle_id": "cycle_001",
+    "day": 1,
+    "kind": "decision",
+    "visibility": "internal",
+    "summary": "Narrow live scope to fitted tops; trousers run as a hidden internal validation track behind the demo.",
+    "actors": [
+      "lucia_ferrer",
+      "nicolas_bianchi",
+      "matias_roldan",
+      "rafaela_peralta",
+      "camila_sosa"
+    ],
+    "source": "derived"
+  },
+  {
+    "id": "cycle_001_log_02",
+    "cycle_id": "cycle_001",
+    "day": 1,
+    "kind": "merchant_signal",
+    "visibility": "mixed",
+    "summary": "Tallea has a real merchant in motion. Cleanup capacity becomes the binding constraint of the next two weeks.",
+    "source": "derived"
+  },
+  {
+    "id": "cycle_001_log_03",
+    "cycle_id": "cycle_001",
+    "day": 1,
+    "kind": "internal_shift",
+    "visibility": "internal",
+    "summary": "Matias and Nicolas leave the room without resolving how to talk publicly about the trousers track.",
+    "actors": [
+      "nicolas_bianchi",
+      "rafaela_peralta",
+      "matias_roldan"
+    ],
+    "source": "derived"
+  },
+  {
+    "id": "cycle_001_log_04",
+    "cycle_id": "cycle_001",
+    "day": 1,
+    "kind": "consequence",
+    "visibility": "internal",
+    "summary": "Veta pilot expects fast catalog ingestion that cleanup capacity cannot honestly meet.",
+    "domain": "merchant",
+    "source": "derived"
+  },
+  {
+    "id": "cycle_001_log_05",
+    "cycle_id": "cycle_001",
+    "day": 1,
+    "kind": "operational",
+    "visibility": "internal",
+    "summary": "Manual catalog cleanup burden now sits at high.",
+    "source": "derived"
+  },
+  {
+    "id": "cycle_002_log_00",
+    "cycle_id": "cycle_002",
+    "day": 2,
+    "kind": "merchant_signal",
+    "visibility": "mixed",
+    "summary": "Veta sends their catalog as a mix of spreadsheets, Instagram screenshots, and WhatsApp voice notes from their head seamstress.",
+    "actors": [
+      "rafaela_peralta",
+      "matias_roldan",
+      "nicolas_bianchi"
+    ],
+    "source": "derived"
+  },
+  {
+    "id": "cycle_002_log_01",
+    "cycle_id": "cycle_002",
+    "day": 2,
+    "kind": "decision",
+    "visibility": "internal",
+    "summary": "Absorb the cleanup. Privately log it as technical debt; publicly keep the demo language unchanged.",
+    "actors": [
+      "rafaela_peralta",
+      "matias_roldan",
+      "nicolas_bianchi"
+    ],
+    "source": "derived"
+  },
+  {
+    "id": "cycle_002_log_02",
+    "cycle_id": "cycle_002",
+    "day": 2,
+    "kind": "conversation",
+    "visibility": "internal",
+    "summary": "Demo will land on time. Internal cost has shifted entirely onto Rafaela's calendar.",
+    "source": "derived"
+  },
+  {
+    "id": "cycle_002_log_03",
+    "cycle_id": "cycle_002",
+    "day": 2,
+    "kind": "internal_shift",
+    "visibility": "internal",
+    "summary": "Rafaela is now the single point of failure for the pilot, and the company's own automation story has quietly drifted further from reality.",
+    "actors": [
+      "rafaela_peralta",
+      "matias_roldan",
+      "nicolas_bianchi"
+    ],
+    "source": "derived"
+  },
+  {
+    "id": "cycle_002_log_04",
+    "cycle_id": "cycle_002",
+    "day": 2,
+    "kind": "consequence",
+    "visibility": "internal",
+    "summary": "Manual cleanup absorbed by Rafaela hides the absence of repeatable ingestion tooling.",
+    "domain": "product",
+    "source": "derived"
+  },
+  {
+    "id": "cycle_002_log_05",
+    "cycle_id": "cycle_002",
+    "day": 2,
+    "kind": "operational",
+    "visibility": "internal",
+    "summary": "Manual catalog cleanup burden now sits at unsustainable.",
+    "source": "derived"
+  },
+  {
+    "id": "cycle_003_log_00",
+    "cycle_id": "cycle_003",
+    "day": 3,
+    "kind": "merchant_signal",
+    "visibility": "mixed",
+    "summary": "Casa Nimbo formalizes a white-label proposal: Tallea fit guidance shipped under their UI, with multi-merchant economics attached.",
+    "actors": [
+      "lucia_ferrer",
+      "nicolas_bianchi",
+      "camila_sosa",
+      "matias_roldan"
+    ],
+    "source": "derived"
+  },
+  {
+    "id": "cycle_003_log_01",
+    "cycle_id": "cycle_003",
+    "day": 3,
+    "kind": "decision",
+    "visibility": "internal",
+    "summary": "Counter with a co-branded structure that preserves a Tallea-visible surface inside Casa Nimbo's UI.",
+    "actors": [
+      "lucia_ferrer",
+      "nicolas_bianchi",
+      "camila_sosa",
+      "matias_roldan"
+    ],
+    "source": "derived"
+  },
+  {
+    "id": "cycle_003_log_02",
+    "cycle_id": "cycle_003",
+    "day": 3,
+    "kind": "conversation",
+    "visibility": "internal",
+    "summary": "The deal is alive but smaller. Internal alignment is now openly split.",
+    "source": "derived"
+  },
+  {
+    "id": "cycle_003_log_03",
+    "cycle_id": "cycle_003",
+    "day": 3,
+    "kind": "internal_shift",
+    "visibility": "internal",
+    "summary": "Camila is meaningfully less aligned with Lucia than yesterday. The team has named the identity question out loud for the first time.",
+    "actors": [
+      "lucia_ferrer",
+      "nicolas_bianchi",
+      "camila_sosa"
+    ],
+    "source": "derived"
+  },
+  {
+    "id": "cycle_003_log_04",
+    "cycle_id": "cycle_003",
+    "day": 3,
+    "kind": "consequence",
+    "visibility": "internal",
+    "summary": "If Casa Nimbo is accepted, the public site will need to be rewritten or quietly downgraded.",
+    "domain": "strategy",
+    "source": "derived"
+  },
+  {
+    "id": "cycle_004_log_00",
+    "cycle_id": "cycle_004",
+    "day": 4,
+    "kind": "merchant_signal",
+    "visibility": "mixed",
+    "summary": "Veta sends their catalog as a mix of spreadsheets, Instagram screenshots, and WhatsApp voice notes from their head seamstress.",
+    "actors": [
+      "rafaela_peralta",
+      "matias_roldan",
+      "nicolas_bianchi"
+    ],
+    "source": "derived"
+  },
+  {
+    "id": "cycle_004_log_01",
+    "cycle_id": "cycle_004",
+    "day": 4,
+    "kind": "decision",
+    "visibility": "internal",
+    "summary": "Absorb the cleanup. Privately log it as technical debt; publicly keep the demo language unchanged.",
+    "actors": [
+      "rafaela_peralta",
+      "matias_roldan",
+      "nicolas_bianchi"
+    ],
+    "source": "derived"
+  },
+  {
+    "id": "cycle_004_log_02",
+    "cycle_id": "cycle_004",
+    "day": 4,
+    "kind": "conversation",
+    "visibility": "internal",
+    "summary": "Demo will land on time. Internal cost has shifted entirely onto Rafaela's calendar.",
+    "source": "derived"
+  },
+  {
+    "id": "cycle_004_log_03",
+    "cycle_id": "cycle_004",
+    "day": 4,
+    "kind": "internal_shift",
+    "visibility": "internal",
+    "summary": "Rafaela is now the single point of failure for the pilot, and the company's own automation story has quietly drifted further from reality.",
+    "actors": [
+      "rafaela_peralta",
+      "matias_roldan",
+      "nicolas_bianchi"
+    ],
+    "source": "derived"
+  },
+  {
+    "id": "cycle_004_log_04",
+    "cycle_id": "cycle_004",
+    "day": 4,
+    "kind": "consequence",
+    "visibility": "internal",
+    "summary": "Manual cleanup absorbed by Rafaela hides the absence of repeatable ingestion tooling.",
+    "domain": "product",
+    "source": "derived"
+  },
+  {
+    "id": "cycle_004_log_05",
+    "cycle_id": "cycle_004",
+    "day": 4,
+    "kind": "operational",
+    "visibility": "internal",
+    "summary": "Manual catalog cleanup burden now sits at unsustainable.",
+    "source": "derived"
+  },
+  {
+    "id": "cycle_005_log_00",
+    "cycle_id": "cycle_005",
+    "day": 5,
+    "kind": "merchant_signal",
+    "visibility": "mixed",
+    "summary": "Casa Nimbo formalizes a white-label proposal: Tallea fit guidance shipped under their UI, with multi-merchant economics attached.",
+    "actors": [
+      "lucia_ferrer",
+      "nicolas_bianchi",
+      "camila_sosa",
+      "matias_roldan"
+    ],
+    "source": "derived"
+  },
+  {
+    "id": "cycle_005_log_01",
+    "cycle_id": "cycle_005",
+    "day": 5,
+    "kind": "decision",
+    "visibility": "internal",
+    "summary": "Counter with a co-branded structure that preserves a Tallea-visible surface inside Casa Nimbo's UI.",
+    "actors": [
+      "lucia_ferrer",
+      "nicolas_bianchi",
+      "camila_sosa",
+      "matias_roldan"
+    ],
+    "source": "derived"
+  },
+  {
+    "id": "cycle_005_log_02",
+    "cycle_id": "cycle_005",
+    "day": 5,
+    "kind": "conversation",
+    "visibility": "internal",
+    "summary": "The deal is alive but smaller. Internal alignment is now openly split.",
+    "source": "derived"
+  },
+  {
+    "id": "cycle_005_log_03",
+    "cycle_id": "cycle_005",
+    "day": 5,
+    "kind": "internal_shift",
+    "visibility": "internal",
+    "summary": "Camila is meaningfully less aligned with Lucia than yesterday. The team has named the identity question out loud for the first time.",
+    "actors": [
+      "lucia_ferrer",
+      "nicolas_bianchi",
+      "camila_sosa"
+    ],
+    "source": "derived"
+  },
+  {
+    "id": "cycle_005_log_04",
+    "cycle_id": "cycle_005",
+    "day": 5,
+    "kind": "consequence",
+    "visibility": "internal",
+    "summary": "If Casa Nimbo is accepted, the public site will need to be rewritten or quietly downgraded.",
+    "domain": "strategy",
+    "source": "derived"
+  },
+  {
+    "id": "cycle_006_log_00",
+    "cycle_id": "cycle_006",
+    "day": 6,
+    "kind": "merchant_signal",
+    "visibility": "mixed",
+    "summary": "Veta sends their catalog as a mix of spreadsheets, Instagram screenshots, and WhatsApp voice notes from their head seamstress.",
+    "actors": [
+      "rafaela_peralta",
+      "matias_roldan",
+      "nicolas_bianchi"
+    ],
+    "source": "derived"
+  },
+  {
+    "id": "cycle_006_log_01",
+    "cycle_id": "cycle_006",
+    "day": 6,
+    "kind": "decision",
+    "visibility": "internal",
+    "summary": "Absorb the cleanup. Privately log it as technical debt; publicly keep the demo language unchanged.",
+    "actors": [
+      "rafaela_peralta",
+      "matias_roldan",
+      "nicolas_bianchi"
+    ],
+    "source": "derived"
+  },
+  {
+    "id": "cycle_006_log_02",
+    "cycle_id": "cycle_006",
+    "day": 6,
+    "kind": "conversation",
+    "visibility": "internal",
+    "summary": "Demo will land on time. Internal cost has shifted entirely onto Rafaela's calendar.",
+    "source": "derived"
+  },
+  {
+    "id": "cycle_006_log_03",
+    "cycle_id": "cycle_006",
+    "day": 6,
+    "kind": "internal_shift",
+    "visibility": "internal",
+    "summary": "Rafaela is now the single point of failure for the pilot, and the company's own automation story has quietly drifted further from reality.",
+    "actors": [
+      "rafaela_peralta",
+      "matias_roldan",
+      "nicolas_bianchi"
+    ],
+    "source": "derived"
+  },
+  {
+    "id": "cycle_006_log_04",
+    "cycle_id": "cycle_006",
+    "day": 6,
+    "kind": "consequence",
+    "visibility": "internal",
+    "summary": "Manual cleanup absorbed by Rafaela hides the absence of repeatable ingestion tooling.",
+    "domain": "product",
+    "source": "derived"
+  },
+  {
+    "id": "cycle_006_log_05",
+    "cycle_id": "cycle_006",
+    "day": 6,
+    "kind": "operational",
+    "visibility": "internal",
+    "summary": "Manual catalog cleanup burden now sits at unsustainable.",
+    "source": "derived"
+  }
+]

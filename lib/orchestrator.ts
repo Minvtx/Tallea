@@ -182,7 +182,13 @@ async function generateWithAI(ctx: CycleContext): Promise<CycleOutput> {
       "internal_shift",
       "operational",
       "consequence",
+      "external_entity_motion",
+      "market_drift",
+      "category_pressure",
+      "public_misreading",
+      "carry_forward",
     ]),
+    layer: z.enum(["company", "around", "ecosystem", "carry_forward"]),
     visibility: z.enum(["internal", "public", "mixed"]),
     summary: z.string(),
     actors: z.array(z.string()).optional(),
@@ -246,12 +252,19 @@ async function generateWithAI(ctx: CycleContext): Promise<CycleOutput> {
     "- Forbidden single-cycle moves unless the recent timeline explicitly built up to them: instant signed paid pilots, public_legitimacy jumps of more than one step, runway_pressure jumps of more than one step, internal_alignment jumps of more than one step, press explosions, acquisition rumors, large fundraising, full repair of openly-strained relationships.",
     "- The state_updates delta must touch at least one character and at least one strategic field. Add at least one pending_consequence unless none would be honest.",
     "",
-    "About logEntries (the daybook layer):",
-    "- The app already stores a one-line-per-cycle highlight timeline. logEntries is a complementary fuller daily record.",
-    "- Provide between 2 and 6 logEntries giving granular beats that did not make it into the headline title/trigger/outcome/residue but happened today.",
-    "- Use visibility=public only for things visible on the homepage or in press. Use visibility=mixed for merchant-facing signals. Default to internal.",
-    "- Keep each summary to one or two sentences. No raw JSON, no debug language. Readable, like a quiet company log.",
-    "- Do NOT restate the title, trigger, decision, outcome or residue verbatim. The publisher already derives baseline log entries from those fields and dedupes against your contributions.",
+    "About logEntries (the daybook):",
+    "- The app already stores a one-line-per-cycle highlight timeline. logEntries is a complementary fuller daily record. The publisher derives baseline entries from the cycle delta (decisions, character shifts, external entity motion, public-layer changes, pending consequences). Your job is to ENRICH the daybook beyond what the delta already implies.",
+    "- Provide between 4 and 8 logEntries with the following layer mix as a target:",
+    "    * 0 to 1 entries with layer=\"company\" (the baseline already covers most company-internal beats)",
+    "    * 1 to 3 entries with layer=\"around\" (specific external entities directly engaging Tallea or its work — named merchants, named beta users by initials, specific outlets, specific operators, specific platforms)",
+    "    * 1 to 3 entries with layer=\"ecosystem\" (ambient world motion that does not directly involve Tallea but matters to it — market sentiment, category pressure, competitor moves, investor chatter, regional commerce news, retail chatter, public misreadings of the category, environmental or operational shifts in Buenos Aires apparel)",
+    "    * 0 to 2 entries with layer=\"carry_forward\" (latent implications, what this changes next, slow-burn consequences not yet activated)",
+    "- Pick the matching kind for each layer. Suggested pairings: company→decision/conversation/internal_shift/operational; around→merchant_signal/trust_signal/press_signal/external_entity_motion; ecosystem→market_drift/category_pressure/public_misreading/external_entity_motion; carry_forward→carry_forward/consequence.",
+    "- Visibility is independent of layer. ecosystem entries are usually public, around entries are often mixed, company entries are usually internal, carry_forward is usually internal.",
+    "- Ambient/ecosystem entries should be SUBTLE SIGNALS. Not breaking news. A regional retailer hesitates. A competitor posts something defensive. A fit-tech newsletter mentions a different company. An operator group chat circulates a misreading. Argentine apparel margins tighten one notch. These are the texture of a real day in this world.",
+    "- Do NOT lore-dump. Each ambient entry must be plausibly relevant to Tallea's current situation, even if Tallea does not act on it today. Do NOT introduce more than one new external entity per cycle. Do NOT swing the broader world hard — most ambient entries should be drifts, not events.",
+    "- Do NOT restate the title, trigger, decision, outcome or residue. The baseline already covers those and the publisher will dedupe paraphrases.",
+    "- Keep each summary to one or two sentences. Readable, like a quiet company log a careful operator would write at end of day.",
   ].join("\n");
 
   const userPrompt = [
@@ -501,6 +514,38 @@ function generateMock(ctx: CycleContext): CycleOutput {
           },
         ],
         state_updates: delta,
+        logEntries: [
+          {
+            kind: "external_entity_motion",
+            layer: "around",
+            visibility: "mixed",
+            summary:
+              "Veta's head of e-commerce forwards the pilot scope to two adjacent fitted-apparel founders in Palermo without copying Tallea.",
+            actors: ["veta"],
+          },
+          {
+            kind: "category_pressure",
+            layer: "ecosystem",
+            visibility: "public",
+            summary:
+              "Argentine apparel returns conversation reappears in two operator newsletters this week — both blame catalog quality, not shopper behavior.",
+          },
+          {
+            kind: "market_drift",
+            layer: "ecosystem",
+            visibility: "mixed",
+            summary:
+              "An LP-curious operator group chat asks whether anyone has seen a real apparel-fit pilot ship in Buenos Aires this year.",
+          },
+          {
+            kind: "carry_forward",
+            layer: "carry_forward",
+            visibility: "internal",
+            summary:
+              "If Veta delivers their catalog inside two weeks, cleanup capacity becomes the next merchant's first impression.",
+            domain: "merchant",
+          },
+        ],
       };
     }
 
@@ -568,6 +613,38 @@ function generateMock(ctx: CycleContext): CycleOutput {
           },
         ],
         state_updates: delta,
+        logEntries: [
+          {
+            kind: "external_entity_motion",
+            layer: "around",
+            visibility: "mixed",
+            summary:
+              "Veta's seamstress sends two voice notes after midnight clarifying measurements her spreadsheet got wrong.",
+            actors: ["veta"],
+          },
+          {
+            kind: "category_pressure",
+            layer: "ecosystem",
+            visibility: "public",
+            summary:
+              "Two Buenos Aires fitted-denim brands publicly complain about return rates this week. Neither mentions catalog quality.",
+          },
+          {
+            kind: "market_drift",
+            layer: "ecosystem",
+            visibility: "public",
+            summary:
+              "MercadoShops releases a generic size-guide widget update. Operator chats read it as defensive against fit-tech upstarts.",
+          },
+          {
+            kind: "carry_forward",
+            layer: "carry_forward",
+            visibility: "internal",
+            summary:
+              "Rafaela becomes a single point of failure for the pilot. The next investor question about ingestion will land here.",
+            domain: "product",
+          },
+        ],
       };
     }
 
@@ -650,6 +727,37 @@ function generateMock(ctx: CycleContext): CycleOutput {
           },
         ],
         state_updates: delta,
+        logEntries: [
+          {
+            kind: "public_misreading",
+            layer: "ecosystem",
+            visibility: "public",
+            summary:
+              "A Spanish-language operator newsletter copies the LatAm Operators Brief framing one day later and adds 'computer vision' to the description, which Tallea does not use.",
+          },
+          {
+            kind: "external_entity_motion",
+            layer: "around",
+            visibility: "mixed",
+            summary:
+              "Three cold inbound emails arrive expecting Tallea to be 'AI sizing as a SaaS'. Two are from outside Argentina.",
+          },
+          {
+            kind: "market_drift",
+            layer: "ecosystem",
+            visibility: "public",
+            summary:
+              "A US fit-tech startup announces a Series A the same morning. Argentine operator chatter reads Tallea into that storyline whether Tallea wants it or not.",
+          },
+          {
+            kind: "carry_forward",
+            layer: "carry_forward",
+            visibility: "internal",
+            summary:
+              "Future merchant calls will start from the AI-sizing framing. The first time Tallea has to correct it inside a sales conversation is a beat that has not arrived yet.",
+            domain: "reputation",
+          },
+        ],
       };
     }
 
@@ -728,6 +836,38 @@ function generateMock(ctx: CycleContext): CycleOutput {
           },
         ],
         state_updates: delta,
+        logEntries: [
+          {
+            kind: "external_entity_motion",
+            layer: "around",
+            visibility: "mixed",
+            summary:
+              "Casa Nimbo's product lead schedules a follow-up the same week and asks whether Tallea's name would appear in the URL.",
+            actors: ["casa_nimbo"],
+          },
+          {
+            kind: "market_drift",
+            layer: "ecosystem",
+            visibility: "public",
+            summary:
+              "Latin American DTC apparel funding tightens another notch. Two regional white-label vendors put out case studies the same afternoon.",
+          },
+          {
+            kind: "category_pressure",
+            layer: "ecosystem",
+            visibility: "mixed",
+            summary:
+              "An operator angel pings Lucia privately to argue that infrastructure is the only durable apparel-tech moat in this region.",
+          },
+          {
+            kind: "carry_forward",
+            layer: "carry_forward",
+            visibility: "internal",
+            summary:
+              "If Casa Nimbo accepts the counter, the homepage will need a structural rewrite within two cycles. If they decline, Camila's user-promise memo becomes the de facto strategy doc.",
+            domain: "strategy",
+          },
+        ],
       };
     }
 
@@ -808,6 +948,37 @@ function generateMock(ctx: CycleContext): CycleOutput {
           },
         ],
         state_updates: delta,
+        logEntries: [
+          {
+            kind: "external_entity_motion",
+            layer: "around",
+            visibility: "mixed",
+            summary:
+              "Two beta users send unprompted notes thanking Tallea for explaining what the body-profile measurements are used for. Neither finished the flow.",
+          },
+          {
+            kind: "category_pressure",
+            layer: "ecosystem",
+            visibility: "public",
+            summary:
+              "Argentine consumer-rights coverage runs a piece on body-data collection by retailers this week. It does not mention Tallea by name; the framing is unfriendly to the category.",
+          },
+          {
+            kind: "market_drift",
+            layer: "ecosystem",
+            visibility: "public",
+            summary:
+              "A US-based fit-tech competitor quietly removes 'AI body model' language from its homepage. Operator chats notice within hours.",
+          },
+          {
+            kind: "carry_forward",
+            layer: "carry_forward",
+            visibility: "internal",
+            summary:
+              "If Camila's rewritten consent copy does not lift completion next cycle, the friction-vs-completion argument becomes structural rather than editorial.",
+            domain: "trust",
+          },
+        ],
       };
     }
 
@@ -877,6 +1048,30 @@ function generateMock(ctx: CycleContext): CycleOutput {
           },
         ],
         state_updates: delta,
+        logEntries: [
+          {
+            kind: "market_drift",
+            layer: "ecosystem",
+            visibility: "public",
+            summary:
+              "A regional commerce conference posts its agenda. Three sessions this year are about apparel returns; none about catalogs.",
+          },
+          {
+            kind: "category_pressure",
+            layer: "ecosystem",
+            visibility: "public",
+            summary:
+              "Fit-tech as a category gets quietly reframed by an industry analyst as 'returns-driven retention tooling'. The framing helps merchants and complicates Tallea's user-led story.",
+          },
+          {
+            kind: "carry_forward",
+            layer: "carry_forward",
+            visibility: "internal",
+            summary:
+              "Strategy week will arrive with a different external context than the team is currently planning for.",
+            domain: "strategy",
+          },
+        ],
       };
     }
   }

@@ -300,6 +300,18 @@ export interface CycleOutput {
 
 export type WorldLogVisibility = "internal" | "public" | "mixed";
 
+/**
+ * Where in the world this beat is happening. Orthogonal to visibility.
+ *
+ *  - company:       inside Tallea (decisions, conversations, internal shifts)
+ *  - around:        around Tallea (specific external entities directly
+ *                   engaging — Veta, Casa Nimbo, beta users, named outlets)
+ *  - ecosystem:     wider ambient world (market sentiment, category drift,
+ *                   competitor moves, investor chatter, regional context)
+ *  - carry_forward: latent consequences and what this changes next
+ */
+export type WorldLogLayer = "company" | "around" | "ecosystem" | "carry_forward";
+
 export type WorldLogKind =
   | "decision"
   | "conversation"
@@ -309,7 +321,13 @@ export type WorldLogKind =
   | "press_signal"
   | "internal_shift"
   | "operational"
-  | "consequence";
+  | "consequence"
+  // Ambient/world-motion kinds
+  | "external_entity_motion"
+  | "market_drift"
+  | "category_pressure"
+  | "public_misreading"
+  | "carry_forward";
 
 export type WorldLogDomain = PendingConsequence["domain"];
 
@@ -322,6 +340,7 @@ export interface WorldLogEntry {
   cycle_id: string;
   day: number;
   kind: WorldLogKind;
+  layer: WorldLogLayer;
   visibility: WorldLogVisibility;
   summary: string;
   actors?: string[];
@@ -335,6 +354,7 @@ export interface WorldLogEntry {
  */
 export interface CycleLogEntryInput {
   kind: WorldLogKind;
+  layer: WorldLogLayer;
   visibility: WorldLogVisibility;
   summary: string;
   actors?: string[];

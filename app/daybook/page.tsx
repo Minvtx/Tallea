@@ -4,6 +4,7 @@ import { EmptyState } from "@/components/empty-state";
 import type {
   TimelineEvent,
   WorldLogEntry,
+  WorldLogLayer,
   WorldLogVisibility,
 } from "@/types/world";
 
@@ -39,12 +40,40 @@ const KIND_LABELS: Record<WorldLogEntry["kind"], string> = {
   internal_shift: "Inside",
   operational: "Ops",
   consequence: "Consequence",
+  external_entity_motion: "Entity",
+  market_drift: "Market",
+  category_pressure: "Category",
+  public_misreading: "Framing",
+  carry_forward: "Carry-forward",
 };
 
 const VISIBILITY_LABELS: Record<WorldLogVisibility, string> = {
   internal: "internal",
   public: "public",
   mixed: "mixed",
+};
+
+// Layer ordering and presentation. The order here defines the vertical
+// reading order within a cycle: company → around → ecosystem → carry-forward.
+const LAYER_ORDER: WorldLogLayer[] = [
+  "company",
+  "around",
+  "ecosystem",
+  "carry_forward",
+];
+
+const LAYER_TITLES: Record<WorldLogLayer, string> = {
+  company: "Inside the company",
+  around: "Around the company",
+  ecosystem: "Ecosystem signals",
+  carry_forward: "Carry-forward",
+};
+
+const LAYER_HINTS: Record<WorldLogLayer, string> = {
+  company: "Decisions, conversations, internal shifts.",
+  around: "External entities directly engaging Tallea.",
+  ecosystem: "Ambient world motion that matters but does not act on Tallea today.",
+  carry_forward: "Latent consequences and what this changes next.",
 };
 
 function passesFilter(entry: WorldLogEntry, view: ViewFilter): boolean {
@@ -70,6 +99,21 @@ function groupByCycle(
     const arr = map.get(e.cycle_id);
     if (arr) arr.push(e);
     else map.set(e.cycle_id, [e]);
+  }
+  return map;
+}
+
+function groupByLayer(
+  entries: WorldLogEntry[],
+): Map<WorldLogLayer, WorldLogEntry[]> {
+  const map = new Map<WorldLogLayer, WorldLogEntry[]>();
+  for (const e of entries) {
+    // Defensive: legacy entries persisted before the schema add do not have
+    // a layer. Fall back to "company" so they still render.
+    const layer: WorldLogLayer = (e.layer ?? "company") as WorldLogLayer;
+    const arr = map.get(layer);
+    if (arr) arr.push(e);
+    else map.set(layer, [e]);
   }
   return map;
 }
@@ -119,9 +163,9 @@ export default async function DaybookPage({
           >
             timeline
           </Link>{" "}
-          shows one headline per cycle. The daybook keeps everything else: the
-          smaller decisions, the conversations that did not make the headline,
-          the consequences quietly added to the company&apos;s memory.
+          shows one headline per cycle. The daybook keeps everything else:
+          smaller decisions inside the company, motion around it, and the
+          ambient ecosystem that drifts whether or not Tallea acts on it.
         </p>
       </header>
 
@@ -178,6 +222,7 @@ export default async function DaybookPage({
           {orderedCycles.map(([cycleId, entries]) => {
             const headline = titleByCycle.get(cycleId);
             const day = entries[0].day;
+            const byLayer = groupByLayer(entries);
             return (
               <article
                 key={cycleId}
@@ -207,48 +252,70 @@ export default async function DaybookPage({
 
                 <div className="col-span-12 md:col-span-9">
                   {headline ? (
-                    <h2 className="font-display text-xl tracking-[-0.012em] leading-snug text-pretty mb-6 text-foreground/85">
+                    <h2 className="font-display text-xl tracking-[-0.012em] leading-snug text-pretty mb-8 text-foreground/85">
                       {headline.title}
                     </h2>
                   ) : null}
 
-                  <ul className="space-y-6">
-                    {entries.map((e) => (
-                      <li key={e.id} className="flex gap-4">
-                        <div className="flex flex-col items-end pt-0.5 min-w-[7rem]">
-                          <span className="eyebrow text-[10px]">
-                            {KIND_LABELS[e.kind]}
-                          </span>
-                          <span
-                            className={`tabular text-[10px] mt-1 ${
-                              e.visibility === "public"
-                                ? "text-accent"
-                                : e.visibility === "mixed"
-                                  ? "text-foreground/70"
-                                  : "text-muted"
-                            }`}
-                          >
-                            {VISIBILITY_LABELS[e.visibility]}
-                          </span>
-                        </div>
-                        <div className="flex-1 border-l hairline pl-4">
-                          <p className="text-[14px] text-foreground/85 leading-relaxed text-pretty">
-                            {e.summary}
-                          </p>
-                          {e.actors && e.actors.length > 0 ? (
-                            <p className="text-[12px] text-muted mt-2">
-                              {e.actors.map(humanizeActor).join(" · ")}
+                  <div className="space-y-10">
+                    {LAYER_ORDER.map((layer) => {
+                      const layerEntries = byLayer.get(layer);
+                      if (!layerEntries || layerEntries.length === 0) return null;
+                      return (
+                        <section
+                          key={layer}
+                          aria-label={LAYER_TITLES[layer]}
+                          className="space-y-4"
+                        >
+                          <header className="flex items-baseline justify-between gap-4">
+                            <h3 className="eyebrow text-[11px] text-foreground/80">
+                              {LAYER_TITLES[layer]}
+                            </h3>
+                            <p className="text-[11px] text-muted text-right max-w-[18rem] hidden sm:block">
+                              {LAYER_HINTS[layer]}
                             </p>
-                          ) : null}
-                          {e.domain ? (
-                            <p className="eyebrow text-[10px] mt-2">
-                              {e.domain}
-                            </p>
-                          ) : null}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
+                          </header>
+                          <ul className="space-y-5">
+                            {layerEntries.map((e) => (
+                              <li key={e.id} className="flex gap-4">
+                                <div className="flex flex-col items-end pt-0.5 min-w-[6rem]">
+                                  <span className="eyebrow text-[10px]">
+                                    {KIND_LABELS[e.kind]}
+                                  </span>
+                                  <span
+                                    className={`tabular text-[10px] mt-1 ${
+                                      e.visibility === "public"
+                                        ? "text-accent"
+                                        : e.visibility === "mixed"
+                                          ? "text-foreground/70"
+                                          : "text-muted"
+                                    }`}
+                                  >
+                                    {VISIBILITY_LABELS[e.visibility]}
+                                  </span>
+                                </div>
+                                <div className="flex-1 border-l hairline pl-4">
+                                  <p className="text-[14px] text-foreground/85 leading-relaxed text-pretty">
+                                    {e.summary}
+                                  </p>
+                                  {e.actors && e.actors.length > 0 ? (
+                                    <p className="text-[12px] text-muted mt-2">
+                                      {e.actors.map(humanizeActor).join(" · ")}
+                                    </p>
+                                  ) : null}
+                                  {e.domain ? (
+                                    <p className="eyebrow text-[10px] mt-2">
+                                      {e.domain}
+                                    </p>
+                                  ) : null}
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        </section>
+                      );
+                    })}
+                  </div>
                 </div>
               </article>
             );
