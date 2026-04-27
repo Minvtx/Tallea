@@ -9,7 +9,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check:data": "node scripts/check-world-data.mjs",
+    "verify": "tsc --noEmit && node scripts/check-world-data.mjs"
   },
   "repository": {
     "type": "git",
@@ -17,14 +19,19 @@
   },
   "license": "ISC",
   "dependencies": {
+    "@ai-sdk/openai": "^3.0.53",
     "@ai-sdk/react": "^3.0.170",
+    "@neondatabase/serverless": "^1.1.0",
     "@tailwindcss/postcss": "^4.2.4",
+    "@workflow/next": "^4.0.5",
     "ai": "^6.0.168",
     "next": "^16.2.4",
     "postcss": "^8.5.10",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
+    "server-only": "^0.0.1",
     "tailwindcss": "^4.2.4",
+    "workflow": "^4.2.4",
     "zod": "^4.3.6"
   },
   "devDependencies": {

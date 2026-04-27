@@ -1,10 +1,11 @@
+import Link from "next/link";
 import { loadTimeline } from "@/lib/loaders";
 import { EmptyState } from "@/components/empty-state";
 
 export const dynamic = "force-dynamic";
 
-export default function TimelinePage() {
-  const events = loadTimeline().slice().reverse();
+export default async function TimelinePage() {
+  const events = (await loadTimeline()).slice().reverse();
 
   return (
     <div className="mx-auto max-w-4xl px-6 pt-12 pb-24">
@@ -17,6 +18,15 @@ export default function TimelinePage() {
           A reverse-chronological record of every cycle the company has lived
           through. Each entry preserves trigger, outcome, and what carries
           forward.
+        </p>
+        <p className="text-[13px] text-muted mt-4">
+          Looking for the smaller beats?{" "}
+          <Link
+            href="/daybook"
+            className="text-foreground hover:text-accent transition-colors"
+          >
+            Read the daybook →
+          </Link>
         </p>
       </header>
 

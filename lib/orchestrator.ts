@@ -3,31 +3,57 @@
  *
  * Two modes:
  *  - mock (default): deterministic event templates driven by current state.
- *  - ai: AI SDK 6 + Vercel AI Gateway + structured output (see generateWithAI).
+ *  - ai: AI SDK 6 + AI Gateway or direct OpenAI + structured output.
  *
  * Mode is selected at runtime by env:
- *   TALLEA_ENABLE_AI=true && AI_GATEWAY_API_KEY=...  -> ai
- *   otherwise                                        -> mock
+ *   TALLEA_ENABLE_AI=true + provider credentials -> ai
+ *   otherwise                                    -> mock
+ *
+ * AI mode env config:
+ *   TALLEA_ENABLE_AI=true     (required)  Flips the orchestrator into AI mode.
+ *   TALLEA_AI_PROVIDER        (optional)  "gateway" or "openai".
+ *   AI_GATEWAY_API_KEY        (gateway)   Vercel AI Gateway key.
+ *   OPENAI_API_KEY            (openai)    Direct OpenAI API key (sk-...).
+ *   TALLEA_AI_MODEL           (optional)  Gateway default: "openai/gpt-4o-mini".
+ *                                         OpenAI default: "gpt-4o-mini".
+ *   TALLEA_AI_TEMPERATURE     (optional)  Default: "0.7". Float 0..1.
+ *
+ * The model only produces structured CycleOutput. The deterministic
+ * publishing layer (lib/state.ts + lib/publisher.ts + lib/log.ts) is what
+ * actually updates the timeline, the daybook, the public site projection
+ * and the realism guardrails. The model never writes to disk directly.
+ *
+ * Any AI failure cleanly falls back to mock generation so the simulation
+ * never stalls — the cycle just runs on deterministic templates instead.
  */
 
 import type {
   CycleOutput,
+  GenerationMetadata,
+  GenerationProvider,
   PendingConsequence,
   SiteProjection,
   TimelineEvent,
+  WorldLogEntry,
   WorldState,
   WorldStateDelta,
 } from "@/types/world";
 import {
   loadCurrentWorldState,
   loadCycleRules,
+  loadEventTypes,
   loadFirstCycleSeed,
   loadInitialState,
   loadRuntimeFoundation,
   loadStateSchema,
   loadTimeline,
+  loadWorldRules,
 } from "@/lib/loaders";
-import { applyAndPersistCycle, writeCycleOutput } from "@/lib/state";
+import {
+  appendGenerationMetadata,
+  applyAndPersistCycle,
+  writeCycleOutput,
+} from "@/lib/state";
 import { deriveProjection } from "@/lib/publisher";
 
 // ---------------------------------------------------------------------------
@@ -39,17 +65,21 @@ export interface CycleContext {
   runtimeFoundation: string;
   cycleRules: string;
   stateSchema: string;
+  eventTypes: string;
+  worldRules: string;
   recentTimeline: TimelineEvent[];
   firstCycleSeed?: string;
 }
 
-export function buildCycleContext(state: WorldState): CycleContext {
-  const recent = loadTimeline().slice(-5);
+export async function buildCycleContext(state: WorldState): Promise<CycleContext> {
+  const recent = (await loadTimeline()).slice(-5);
   return {
     state,
     runtimeFoundation: loadRuntimeFoundation(),
     cycleRules: loadCycleRules(),
     stateSchema: loadStateSchema(),
+    eventTypes: loadEventTypes(),
+    worldRules: loadWorldRules(),
     recentTimeline: recent,
     firstCycleSeed: state.world.day === 0 ? loadFirstCycleSeed() : undefined,
   };
@@ -61,14 +91,85 @@ export function buildCycleContext(state: WorldState): CycleContext {
 
 export type CycleMode = "mock" | "ai";
 
-export function getCycleMode(): CycleMode {
+export type CycleModeReason =
+  | "ai_enabled"
+  | "missing_enable_flag"
+  | "gateway_missing_key"
+  | "missing_openai_key";
+
+export type CycleAIProvider = "gateway" | "openai";
+
+export function getCycleModeStatus(): {
+  mode: CycleMode;
+  reason: CycleModeReason;
+  provider: GenerationProvider;
+  model: string;
+  temperature: number;
+} {
+  const enabled = process.env.TALLEA_ENABLE_AI === "true";
+  const hasGatewayKey = (process.env.AI_GATEWAY_API_KEY ?? "").length > 0;
+  const hasOpenAIKey = (process.env.OPENAI_API_KEY ?? "").length > 0;
+  const explicitProvider = process.env.TALLEA_AI_PROVIDER?.toLowerCase();
   if (
-    process.env.TALLEA_ENABLE_AI === "true" &&
-    (process.env.AI_GATEWAY_API_KEY ?? "").length > 0
+    explicitProvider !== undefined &&
+    explicitProvider !== "gateway" &&
+    explicitProvider !== "openai"
   ) {
-    return "ai";
+    throw new Error(
+      `Unsupported TALLEA_AI_PROVIDER="${explicitProvider}". Use "gateway" or "openai".`,
+    );
   }
-  return "mock";
+  const provider: CycleAIProvider =
+    explicitProvider === "gateway" || explicitProvider === "openai"
+      ? explicitProvider
+      : hasGatewayKey
+        ? "gateway"
+        : "openai";
+  const model =
+    process.env.TALLEA_AI_MODEL ??
+    (provider === "gateway" ? "openai/gpt-4o-mini" : "gpt-4o-mini");
+  const temperature = (() => {
+    const raw = process.env.TALLEA_AI_TEMPERATURE;
+    if (!raw) return 0.7;
+    const n = Number.parseFloat(raw);
+    return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.7;
+  })();
+
+  if (!enabled) {
+    return {
+      mode: "mock",
+      reason: "missing_enable_flag",
+      provider: "mock",
+      model,
+      temperature,
+    };
+  }
+
+  if (provider === "gateway" && !hasGatewayKey) {
+    return {
+      mode: "ai",
+      reason: "gateway_missing_key",
+      provider,
+      model,
+      temperature,
+    };
+  }
+
+  if (provider === "openai" && !hasOpenAIKey) {
+    return {
+      mode: "mock",
+      reason: "missing_openai_key",
+      provider: "mock",
+      model,
+      temperature,
+    };
+  }
+
+  return { mode: "ai", reason: "ai_enabled", provider, model, temperature };
+}
+
+export function getCycleMode(): CycleMode {
+  return getCycleModeStatus().mode;
 }
 
 // ---------------------------------------------------------------------------
@@ -76,9 +177,17 @@ export function getCycleMode(): CycleMode {
 // ---------------------------------------------------------------------------
 
 async function generateWithAI(ctx: CycleContext): Promise<CycleOutput> {
-  // Lazy import so mock mode never pulls in the AI SDK
-  const { generateObject } = await import("ai");
+  // Lazy imports so mock mode never pulls in the AI SDK at all.
+  const { gateway, generateObject } = await import("ai");
+  const { openai } = await import("@ai-sdk/openai");
   const { z } = await import("zod");
+
+  const { model, provider, reason, temperature } = getCycleModeStatus();
+  if (provider === "gateway" && reason === "gateway_missing_key") {
+    throw new Error(
+      "TALLEA_AI_PROVIDER=gateway requires AI_GATEWAY_API_KEY. Add an AI Gateway key in Vercel, or set TALLEA_AI_PROVIDER=openai with OPENAI_API_KEY.",
+    );
+  }
 
   const ConsequenceSchema = z.object({
     source_event_id: z.string(),
@@ -127,6 +236,40 @@ async function generateWithAI(ctx: CycleContext): Promise<CycleOutput> {
     status: z.enum(["opened", "developing", "resolved", "deferred"]),
   });
 
+  const LogEntrySchema = z.object({
+    kind: z.enum([
+      "decision",
+      "conversation",
+      "merchant_signal",
+      "product_change",
+      "trust_signal",
+      "press_signal",
+      "internal_shift",
+      "operational",
+      "consequence",
+      "external_entity_motion",
+      "market_drift",
+      "category_pressure",
+      "public_misreading",
+      "carry_forward",
+    ]),
+    layer: z.enum(["company", "around", "ecosystem", "carry_forward"]),
+    visibility: z.enum(["internal", "public", "mixed"]),
+    summary: z.string(),
+    actors: z.array(z.string()).optional(),
+    domain: z
+      .enum([
+        "product",
+        "trust",
+        "merchant",
+        "reputation",
+        "runway",
+        "relationship",
+        "strategy",
+      ])
+      .optional(),
+  });
+
   const CycleSchema = z.object({
     cycle_id: z.string(),
     day: z.number(),
@@ -142,6 +285,7 @@ async function generateWithAI(ctx: CycleContext): Promise<CycleOutput> {
     next_hooks: z.array(z.string()),
     threads: z.array(ThreadSchema),
     state_updates: DeltaSchema,
+    logEntries: z.array(LogEntrySchema).optional(),
   });
 
   const day = ctx.state.world.day + 1;
@@ -161,20 +305,61 @@ async function generateWithAI(ctx: CycleContext): Promise<CycleOutput> {
     pending_consequences: ctx.state.pending_consequences,
   };
 
-  const prompt = [
+  const system = [
     "You are the orchestrator for a persistent simulated startup world named Tallea.",
-    "Generate the next cycle as a CycleOutput object that conforms to the schema.",
+    "Tallea is a five-person Buenos Aires fit-intelligence company with finite runway.",
+    "You generate exactly one cycle (one in-universe day) as a structured CycleOutput.",
+    "",
+    "Hard rules:",
+    "- Output only the structured object the schema requires. No prose outside the object.",
+    "- The deterministic publishing layer in this app applies your delta, clamps single-cycle jumps to one step on key ladders, persists the timeline, and derives the public site. You do not write to disk; you emit a cycle.",
+    "- Honor canonical realism: most cycles advance a thread rather than concluding one; public narrative lags internal state; pressure usually accumulates rather than resolves; a signal is more honest than a result.",
+    "- Forbidden single-cycle moves unless the recent timeline explicitly built up to them: instant signed paid pilots, public_legitimacy jumps of more than one step, runway_pressure jumps of more than one step, internal_alignment jumps of more than one step, press explosions, acquisition rumors, large fundraising, full repair of openly-strained relationships.",
+    "- The state_updates delta must touch at least one character and at least one strategic field. Add at least one pending_consequence unless none would be honest.",
+    "",
+    "Distinctiveness — important:",
+    "- The runtime contains a small set of canonical mock-mode templates used when AI generation is disabled. When YOU are generating, your output must be visibly distinguishable from those templates. Do NOT reuse any of these exact mock-mode titles verbatim:",
+    "    * \"Veta says yes, with a deadline\"",
+    "    * \"The catalog arrives, and it is a mess\"",
+    "    * \"A newsletter calls Tallea 'AI sizing'\"",
+    "    * \"Casa Nimbo wants Tallea behind their brand\"",
+    "    * \"The team finally says it out loud\"",
+    "    * \"Beta users hesitate at the body-profile flow\"",
+    "- The world is bigger than these specific beats. The event_types catalog is reference, not a menu. If the day's most honest beat happens to map to one of the mock themes, choose a different angle on it (different actor, different detail, different time of day, different framing) so the title is genuinely your own.",
+    "- Vary structure across cycles. Some cycles are conversations that almost happen. Some are quiet operational days where the most important thing is something nobody decides. Some are misreadings the team only catches later.",
+    "",
+    "About logEntries (the daybook):",
+    "- The app already stores a one-line-per-cycle highlight timeline. logEntries is a complementary fuller daily record. The publisher derives baseline entries from the cycle delta (decisions, character shifts, external entity motion, public-layer changes, pending consequences). Your job is to ENRICH the daybook beyond what the delta already implies.",
+    "- Provide between 4 and 8 logEntries with the following layer mix as a target:",
+    "    * 0 to 1 entries with layer=\"company\" (the baseline already covers most company-internal beats)",
+    "    * 1 to 3 entries with layer=\"around\" (specific external entities directly engaging Tallea or its work — named merchants, named beta users by initials, specific outlets, specific operators, specific platforms)",
+    "    * 1 to 3 entries with layer=\"ecosystem\" (ambient world motion that does not directly involve Tallea but matters to it — market sentiment, category pressure, competitor moves, investor chatter, regional commerce news, retail chatter, public misreadings of the category, environmental or operational shifts in Buenos Aires apparel)",
+    "    * 0 to 2 entries with layer=\"carry_forward\" (latent implications, what this changes next, slow-burn consequences not yet activated)",
+    "- Pick the matching kind for each layer. Suggested pairings: company→decision/conversation/internal_shift/operational; around→merchant_signal/trust_signal/press_signal/external_entity_motion; ecosystem→market_drift/category_pressure/public_misreading/external_entity_motion; carry_forward→carry_forward/consequence.",
+    "- Visibility is independent of layer. ecosystem entries are usually public, around entries are often mixed, company entries are usually internal, carry_forward is usually internal.",
+    "- Ambient/ecosystem entries should be SUBTLE SIGNALS. Not breaking news. A regional retailer hesitates. A competitor posts something defensive. A fit-tech newsletter mentions a different company. An operator group chat circulates a misreading. Argentine apparel margins tighten one notch. These are the texture of a real day in this world.",
+    "- Do NOT lore-dump. Each ambient entry must be plausibly relevant to Tallea's current situation, even if Tallea does not act on it today. Do NOT introduce more than one new external entity per cycle. Do NOT swing the broader world hard — most ambient entries should be drifts, not events.",
+    "- Do NOT restate the title, trigger, decision, outcome or residue. The baseline already covers those and the publisher will dedupe paraphrases.",
+    "- Keep each summary to one or two sentences. Readable, like a quiet company log a careful operator would write at end of day.",
+  ].join("\n");
+
+  const userPrompt = [
+    `## Cycle to generate: ${cycleId} (day ${day})`,
     "",
     "## Runtime Foundation",
     ctx.runtimeFoundation,
     "",
+    "## World Rules (realism canon)",
+    ctx.worldRules,
+    "",
     "## Cycle Generation Rules",
     ctx.cycleRules,
     "",
+    "## Event Types (canonical event catalog)",
+    ctx.eventTypes,
+    "",
     "## State Schema",
     ctx.stateSchema,
-    "",
-    `## Cycle ID: ${cycleId} (day ${day})`,
     "",
     "## Current World State (compact)",
     JSON.stringify(compactState, null, 2),
@@ -185,15 +370,36 @@ async function generateWithAI(ctx: CycleContext): Promise<CycleOutput> {
       ? "\n## Day 0 Seed (use this for the first cycle)\n" + ctx.firstCycleSeed
       : "",
     "",
-    "Generate exactly one cycle. The state_updates delta must touch at least one character and at least one strategic field. Add at least one pending_consequence unless none would be honest.",
+    "Generate exactly one cycle now.",
   ].join("\n");
 
-  const result = await generateObject({
-    model: "openai/gpt-5-mini",
-    schema: CycleSchema,
-    prompt,
-  });
+  const startedAt = Date.now();
+  let result;
+  const languageModel =
+    provider === "gateway" ? gateway(model) : openai(model);
+  try {
+    result = await generateObject({
+      model: languageModel,
+      schema: CycleSchema,
+      system,
+      prompt: userPrompt,
+      temperature,
+    });
+  } catch (err) {
+    const elapsed = Date.now() - startedAt;
+    console.error(
+      `[orchestrator:ai] generateObject failed provider=${provider} model=${model} after ${elapsed}ms`,
+      err,
+    );
+    throw err;
+  }
+  const elapsed = Date.now() - startedAt;
+  console.log(
+    `[orchestrator:ai] generated cycle=${cycleId} day=${day} provider=${provider} model=${model} temp=${temperature} in ${elapsed}ms`,
+  );
 
+  // The model proposes cycle_id and day, but the orchestrator owns them.
+  // We override to avoid drift between generation and persistence.
   return {
     ...(result.object as CycleOutput),
     cycle_id: cycleId,
@@ -210,7 +416,8 @@ type EventKind =
   | "catalog_mess"
   | "product_claim"
   | "white_label"
-  | "internal_repair";
+  | "internal_repair"
+  | "trust_friction";
 
 const KIND_TITLES: Record<EventKind, string> = {
   merchant_pilot: "Veta says yes, with a deadline",
@@ -218,6 +425,7 @@ const KIND_TITLES: Record<EventKind, string> = {
   product_claim: "A newsletter calls Tallea 'AI sizing'",
   white_label: "Casa Nimbo wants Tallea behind their brand",
   internal_repair: "The team finally says it out loud",
+  trust_friction: "Beta users hesitate at the body-profile flow",
 };
 
 /**
@@ -265,8 +473,12 @@ function pickEventKind(state: WorldState, recent: TimelineEvent[]): EventKind {
   }
 
   // Rotation, also skipping lastKind so back-to-back duplicates never happen.
+  // `trust_friction` is included so the world has a canonical low-stakes,
+  // internal-only beat (Camila empowered, no public-facing change). This
+  // models the runtime rule "internal change before public change".
   const rot: EventKind[] = [
     "merchant_pilot",
+    "trust_friction",
     "internal_repair",
     "product_claim",
     "catalog_mess",
@@ -283,6 +495,25 @@ function generateMock(ctx: CycleContext): CycleOutput {
 
   switch (kind) {
     case "merchant_pilot": {
+      // Realistic progression: a single cycle of "merchant says yes" should
+      // move the pipeline forward by one stage at most. Going from
+      // `early_interest` directly to `active_pilot` skips the
+      // `pilot_conversation` stage that the type system already encodes.
+      const currentPipeline = state.traction_state.merchant_pipeline.status;
+      const nextPipeline =
+        currentPipeline === "early_interest" || currentPipeline === "none"
+          ? "pilot_conversation"
+          : currentPipeline === "pilot_conversation"
+            ? "active_pilot"
+            : currentPipeline;
+
+      // Cleanup burden should only escalate, never quietly downgrade. If we
+      // were already at `unsustainable`, a new pilot does not magically reduce
+      // the backlog.
+      const currentCleanup = state.product_state.manual_cleanup_burden;
+      const nextCleanup =
+        currentCleanup === "unsustainable" ? "unsustainable" : "high";
+
       const consequence: PendingConsequence = {
         source_event_id: cycleId,
         description:
@@ -295,12 +526,12 @@ function generateMock(ctx: CycleContext): CycleOutput {
       const delta: WorldStateDelta = {
         traction_state: {
           merchant_pipeline: {
-            status: "active_pilot",
+            status: nextPipeline,
             active_pilot_conversations:
               state.traction_state.merchant_pipeline.active_pilot_conversations + 1,
           },
         },
-        product_state: { manual_cleanup_burden: "high" },
+        product_state: { manual_cleanup_burden: nextCleanup },
         external_entities: {
           veta: { status: "active_pilot", pressure: "tighter scope, real deadline" },
         },
@@ -361,6 +592,38 @@ function generateMock(ctx: CycleContext): CycleOutput {
           },
         ],
         state_updates: delta,
+        logEntries: [
+          {
+            kind: "external_entity_motion",
+            layer: "around",
+            visibility: "mixed",
+            summary:
+              "Veta's head of e-commerce forwards the pilot scope to two adjacent fitted-apparel founders in Palermo without copying Tallea.",
+            actors: ["veta"],
+          },
+          {
+            kind: "category_pressure",
+            layer: "ecosystem",
+            visibility: "public",
+            summary:
+              "Argentine apparel returns conversation reappears in two operator newsletters this week — both blame catalog quality, not shopper behavior.",
+          },
+          {
+            kind: "market_drift",
+            layer: "ecosystem",
+            visibility: "mixed",
+            summary:
+              "An LP-curious operator group chat asks whether anyone has seen a real apparel-fit pilot ship in Buenos Aires this year.",
+          },
+          {
+            kind: "carry_forward",
+            layer: "carry_forward",
+            visibility: "internal",
+            summary:
+              "If Veta delivers their catalog inside two weeks, cleanup capacity becomes the next merchant's first impression.",
+            domain: "merchant",
+          },
+        ],
       };
     }
 
@@ -428,12 +691,58 @@ function generateMock(ctx: CycleContext): CycleOutput {
           },
         ],
         state_updates: delta,
+        logEntries: [
+          {
+            kind: "external_entity_motion",
+            layer: "around",
+            visibility: "mixed",
+            summary:
+              "Veta's seamstress sends two voice notes after midnight clarifying measurements her spreadsheet got wrong.",
+            actors: ["veta"],
+          },
+          {
+            kind: "category_pressure",
+            layer: "ecosystem",
+            visibility: "public",
+            summary:
+              "Two Buenos Aires fitted-denim brands publicly complain about return rates this week. Neither mentions catalog quality.",
+          },
+          {
+            kind: "market_drift",
+            layer: "ecosystem",
+            visibility: "public",
+            summary:
+              "MercadoShops releases a generic size-guide widget update. Operator chats read it as defensive against fit-tech upstarts.",
+          },
+          {
+            kind: "carry_forward",
+            layer: "carry_forward",
+            visibility: "internal",
+            summary:
+              "Rafaela becomes a single point of failure for the pilot. The next investor question about ingestion will land here.",
+            domain: "product",
+          },
+        ],
       };
     }
 
     case "product_claim": {
+      // A single newsletter mention should move public_legitimacy at most one
+      // step up from its current rung, and only if there is somewhere to go.
+      // Going from `cold` or `damaged` directly to `rising` would be a leap
+      // that the canon "what changes slowly" rules forbid.
+      const currentLegitimacy = state.company_state.public_legitimacy;
+      const stepUp: Record<typeof currentLegitimacy, typeof currentLegitimacy> = {
+        damaged: "cold",
+        cold: "fragile_warm",
+        fragile_warm: "rising",
+        rising: "overexposed",
+        overexposed: "overexposed",
+      };
+      const nextLegitimacy = stepUp[currentLegitimacy];
+
       const delta: WorldStateDelta = {
-        company_state: { public_legitimacy: "rising" },
+        company_state: { public_legitimacy: nextLegitimacy },
         public_layer: {
           category_interpretation: "AI sizing",
           misinterpretation_risk: "the press flattens fit intelligence into AI sizing",
@@ -496,6 +805,37 @@ function generateMock(ctx: CycleContext): CycleOutput {
           },
         ],
         state_updates: delta,
+        logEntries: [
+          {
+            kind: "public_misreading",
+            layer: "ecosystem",
+            visibility: "public",
+            summary:
+              "A Spanish-language operator newsletter copies the LatAm Operators Brief framing one day later and adds 'computer vision' to the description, which Tallea does not use.",
+          },
+          {
+            kind: "external_entity_motion",
+            layer: "around",
+            visibility: "mixed",
+            summary:
+              "Three cold inbound emails arrive expecting Tallea to be 'AI sizing as a SaaS'. Two are from outside Argentina.",
+          },
+          {
+            kind: "market_drift",
+            layer: "ecosystem",
+            visibility: "public",
+            summary:
+              "A US fit-tech startup announces a Series A the same morning. Argentine operator chatter reads Tallea into that storyline whether Tallea wants it or not.",
+          },
+          {
+            kind: "carry_forward",
+            layer: "carry_forward",
+            visibility: "internal",
+            summary:
+              "Future merchant calls will start from the AI-sizing framing. The first time Tallea has to correct it inside a sales conversation is a beat that has not arrived yet.",
+            domain: "reputation",
+          },
+        ],
       };
     }
 
@@ -574,13 +914,170 @@ function generateMock(ctx: CycleContext): CycleOutput {
           },
         ],
         state_updates: delta,
+        logEntries: [
+          {
+            kind: "external_entity_motion",
+            layer: "around",
+            visibility: "mixed",
+            summary:
+              "Casa Nimbo's product lead schedules a follow-up the same week and asks whether Tallea's name would appear in the URL.",
+            actors: ["casa_nimbo"],
+          },
+          {
+            kind: "market_drift",
+            layer: "ecosystem",
+            visibility: "public",
+            summary:
+              "Latin American DTC apparel funding tightens another notch. Two regional white-label vendors put out case studies the same afternoon.",
+          },
+          {
+            kind: "category_pressure",
+            layer: "ecosystem",
+            visibility: "mixed",
+            summary:
+              "An operator angel pings Lucia privately to argue that infrastructure is the only durable apparel-tech moat in this region.",
+          },
+          {
+            kind: "carry_forward",
+            layer: "carry_forward",
+            visibility: "internal",
+            summary:
+              "If Casa Nimbo accepts the counter, the homepage will need a structural rewrite within two cycles. If they decline, Camila's user-promise memo becomes the de facto strategy doc.",
+            domain: "strategy",
+          },
+        ],
+      };
+    }
+
+    case "trust_friction": {
+      // Canonical low-stakes, internal-only beat. Empowers Camila, moves
+      // user_beta.completion, leaves no public-facing change. Models the
+      // runtime rule "internal change before public change".
+      const delta: WorldStateDelta = {
+        traction_state: {
+          user_beta: {
+            completion: "uneven",
+            main_blocker: "body-profile intimacy and flow length",
+          },
+        },
+        character_states: {
+          camila_sosa: {
+            stress: "medium_high",
+            influence: "medium_high_trust",
+            last_major_shift:
+              "Walked the team through three drop-off points in the body-profile flow.",
+          },
+          nicolas_bianchi: {
+            last_major_shift:
+              "Pushed back on adding a consent screen before checkout for pilot users.",
+          },
+        },
+        relationship_state: {
+          camila_nicolas: "openly_strained",
+        },
+        open_tensions_added: ["consent friction vs onboarding completion"],
+        pending_consequences_added: [
+          {
+            source_event_id: cycleId,
+            description:
+              "If consent copy is rushed to lift completion, a future trust incident will trace back here.",
+            time_horizon: "medium",
+            domain: "trust",
+            status: "pending",
+          },
+        ],
+      };
+      return {
+        cycle_id: cycleId,
+        day,
+        title: "Beta users hesitate at the body-profile flow",
+        trigger:
+          "Camila brings completion data to the team: three quarters of beta users start the body-profile flow, fewer than half finish it, and the drop-off concentrates exactly where measurement language gets specific.",
+        primary_pressure:
+          "Trust costs friction; friction costs completion.",
+        secondary_pressure:
+          "Nicolas wants completion to look better before the next merchant call.",
+        internal_translation:
+          "Camila refuses to call the consent screen 'overhead'. Nicolas calls it 'one obstacle too many'. Lucia stays quiet. Matias asks whether the model is even confident on the segments that do complete.",
+        decision_point:
+          "Trim the consent screen for the next pilot, or hold the line and accept the lower completion number for one more cycle.",
+        decision_made:
+          "Hold the line for one more cycle. Camila will rewrite the consent copy, not remove it.",
+        outcome:
+          "Nothing visible to the public changes. The user-trust posture is preserved at a measurable cost to short-term completion.",
+        residue:
+          "Camila and Nicolas now disagree out loud about how much friction the user is allowed to feel. The disagreement was previously polite.",
+        next_hooks: [
+          "Camila ships rewritten consent copy and completion does not improve",
+          "A merchant asks why beta completion is lower than they expected",
+          "Nicolas raises the friction question again at a more loaded moment",
+        ],
+        threads: [
+          {
+            thread_id: "user_trust",
+            title: "Body-profile trust and completion",
+            affected_characters: [
+              "camila_sosa",
+              "nicolas_bianchi",
+              "lucia_ferrer",
+              "matias_roldan",
+            ],
+            status: "developing",
+          },
+        ],
+        state_updates: delta,
+        logEntries: [
+          {
+            kind: "external_entity_motion",
+            layer: "around",
+            visibility: "mixed",
+            summary:
+              "Two beta users send unprompted notes thanking Tallea for explaining what the body-profile measurements are used for. Neither finished the flow.",
+          },
+          {
+            kind: "category_pressure",
+            layer: "ecosystem",
+            visibility: "public",
+            summary:
+              "Argentine consumer-rights coverage runs a piece on body-data collection by retailers this week. It does not mention Tallea by name; the framing is unfriendly to the category.",
+          },
+          {
+            kind: "market_drift",
+            layer: "ecosystem",
+            visibility: "public",
+            summary:
+              "A US-based fit-tech competitor quietly removes 'AI body model' language from its homepage. Operator chats notice within hours.",
+          },
+          {
+            kind: "carry_forward",
+            layer: "carry_forward",
+            visibility: "internal",
+            summary:
+              "If Camila's rewritten consent copy does not lift completion next cycle, the friction-vs-completion argument becomes structural rather than editorial.",
+            domain: "trust",
+          },
+        ],
       };
     }
 
     case "internal_repair":
     default: {
+      // A single non-agenda meeting should not collapse a fracture. Only
+      // step up by one rung, and never above `functional_but_split` (full
+      // alignment requires structural follow-through, not a conversation).
+      const currentAlignment = state.company_state.internal_alignment;
+      const repaired: typeof currentAlignment =
+        currentAlignment === "fractured"
+          ? "openly_split"
+          : currentAlignment === "openly_split"
+            ? "functional_but_split"
+            : currentAlignment;
+
       const delta: WorldStateDelta = {
-        company_state: { internal_alignment: "functional_but_split" },
+        company_state:
+          repaired !== currentAlignment
+            ? { internal_alignment: repaired }
+            : {},
         character_states: {
           lucia_ferrer: { last_major_shift: "Acknowledged the identity question publicly inside the team." },
           camila_sosa: { stress: "medium" },
@@ -629,6 +1126,30 @@ function generateMock(ctx: CycleContext): CycleOutput {
           },
         ],
         state_updates: delta,
+        logEntries: [
+          {
+            kind: "market_drift",
+            layer: "ecosystem",
+            visibility: "public",
+            summary:
+              "A regional commerce conference posts its agenda. Three sessions this year are about apparel returns; none about catalogs.",
+          },
+          {
+            kind: "category_pressure",
+            layer: "ecosystem",
+            visibility: "public",
+            summary:
+              "Fit-tech as a category gets quietly reframed by an industry analyst as 'returns-driven retention tooling'. The framing helps merchants and complicates Tallea's user-led story.",
+          },
+          {
+            kind: "carry_forward",
+            layer: "carry_forward",
+            visibility: "internal",
+            summary:
+              "Strategy week will arrive with a different external context than the team is currently planning for.",
+            domain: "strategy",
+          },
+        ],
       };
     }
   }
@@ -638,52 +1159,149 @@ function generateMock(ctx: CycleContext): CycleOutput {
 // Public entry points
 // ---------------------------------------------------------------------------
 
+/**
+ * Per-cycle generation result, including observability metadata that records
+ * what *actually* ran (not what env vars say). The metadata distinguishes
+ *   - "ai":               AI generation succeeded
+ *   - "mock":             AI mode was off; mock template ran
+ *   - "fallback_to_mock": AI mode was on; AI threw; mock ran
+ *
+ * This closes the previous gap where a silent AI failure was indistinguishable
+ * from a successful AI run from the admin UI / cron response.
+ */
+export interface GenerateResult {
+  cycle: CycleOutput;
+  /** Partial; the orchestrator fills cycle_id/day/title/generated_at on persist. */
+  metadata: Omit<
+    GenerationMetadata,
+    "cycle_id" | "day" | "title" | "generated_at"
+  >;
+}
+
 export async function generateCycleOutput(
   ctx: CycleContext,
-): Promise<CycleOutput> {
-  if (getCycleMode() === "ai") {
+): Promise<GenerateResult> {
+  const status = getCycleModeStatus();
+  const startedAt = Date.now();
+
+  if (status.mode === "ai") {
     try {
-      return await generateWithAI(ctx);
+      const cycle = await generateWithAI(ctx);
+      return {
+        cycle,
+        metadata: {
+          actual_mode: "ai",
+          env_mode: "ai",
+          provider: status.provider,
+          model: status.model,
+          temperature: status.temperature,
+          duration_ms: Date.now() - startedAt,
+        },
+      };
     } catch (err) {
-      console.error("[orchestrator] AI generation failed, falling back to mock:", err);
-      return generateMock(ctx);
+      const fallbackReason =
+        err instanceof Error ? `${err.name}: ${err.message}` : "unknown error";
+      console.error(
+        "[orchestrator] AI generation failed, falling back to mock:",
+        err,
+      );
+      const cycle = generateMock(ctx);
+      return {
+        cycle,
+        metadata: {
+          actual_mode: "fallback_to_mock",
+          env_mode: "ai",
+          provider: status.provider,
+          model: status.model,
+          temperature: status.temperature,
+          duration_ms: Date.now() - startedAt,
+          fallback_reason: fallbackReason,
+        },
+      };
     }
   }
-  return generateMock(ctx);
+
+  const cycle = generateMock(ctx);
+  return {
+    cycle,
+    metadata: {
+      actual_mode: "mock",
+      env_mode: "mock",
+      provider: "mock",
+      duration_ms: Date.now() - startedAt,
+    },
+  };
 }
 
 export interface RunCycleResult {
   cycleOutput: CycleOutput;
   nextState: WorldState;
   timelineEvent: TimelineEvent;
+  logEntries: WorldLogEntry[];
   projection: SiteProjection;
-  mode: CycleMode;
+  /** What actually ran for this cycle. Reflects fallback, not env. */
+  generation: GenerationMetadata;
 }
 
-/**
- * Run a single cycle: load state, generate, persist, project. Single entry
- * point for /admin and the cron route.
- */
-export async function runWorldCycle(): Promise<RunCycleResult> {
-  let state = await loadCurrentWorldState();
-  if (!state) {
-    state = loadInitialState();
-    if (!state) {
-      throw new Error("No initial state found at data/seed/initial_state.json");
-    }
-  }
-
-  const ctx = buildCycleContext(state);
-  const cycleOutput = await generateCycleOutput(ctx);
-  writeCycleOutput(cycleOutput);
-  const { nextState, timelineEvent } = applyAndPersistCycle(state, cycleOutput);
+export async function persistGeneratedCycle(
+  state: WorldState,
+  generated: GenerateResult,
+): Promise<RunCycleResult> {
+  const { cycle: cycleOutput, metadata: partialMeta } = generated;
+  await writeCycleOutput(cycleOutput);
+  const { nextState, timelineEvent, logEntries } = await applyAndPersistCycle(
+    state,
+    cycleOutput,
+  );
   const projection = deriveProjection(nextState);
+
+  const generation: GenerationMetadata = {
+    cycle_id: cycleOutput.cycle_id,
+    day: cycleOutput.day,
+    generated_at: new Date().toISOString(),
+    title: cycleOutput.title,
+    ...partialMeta,
+  };
+  await appendGenerationMetadata(generation);
+
+  console.log(
+    `[orchestrator] cycle=${cycleOutput.cycle_id} day=${cycleOutput.day} actual_mode=${generation.actual_mode} provider=${generation.provider ?? "unknown"}${
+      generation.model ? ` model=${generation.model}` : ""
+    } duration_ms=${generation.duration_ms}${
+      generation.fallback_reason
+        ? ` fallback_reason="${generation.fallback_reason}"`
+        : ""
+    }`,
+  );
 
   return {
     cycleOutput,
     nextState,
     timelineEvent,
+    logEntries,
     projection,
-    mode: getCycleMode(),
+    generation,
   };
+}
+
+/**
+ * Run a single cycle: load state, generate, persist, project, and record
+ * generation metadata. Direct execution entry point used by the cycle runner.
+ *
+ * Generation is the only step where the AI model is involved; everything
+ * downstream (delta application, realism clamps, timeline, daybook,
+ * projection) is deterministic.
+ */
+export async function runWorldCycle(): Promise<RunCycleResult> {
+  let state = await loadCurrentWorldState();
+  if (!state) {
+    state = await loadInitialState();
+    if (!state) {
+      throw new Error("No initial state found at data/seed/initial_state.json");
+    }
+  }
+
+  const ctx = await buildCycleContext(state);
+  const generated = await generateCycleOutput(ctx);
+  return persistGeneratedCycle(state, generated);
 }

@@ -279,6 +279,116 @@ export interface CycleOutput {
   next_hooks: string[];
   threads: NarrativeThread[];
   state_updates: WorldStateDelta;
+  /**
+   * Optional finer-grained daily log entries the orchestrator (mock or AI)
+   * can attach to enrich the public daybook beyond the headline timeline.
+   *
+   * The deterministic publishing layer always derives a baseline set of
+   * WorldLogEntries from the cycle (decision, residue, consequences, public
+   * shifts). Anything in `logEntries` here is merged on top so the model
+   * can add color without owning the canonical record.
+   */
+  logEntries?: CycleLogEntryInput[];
+}
+
+// ---------------------------------------------------------------------------
+// World log / Daybook (fuller daily record beyond the highlight timeline)
+//
+// timeline.json   = one TimelineEvent per cycle (the headline)
+// log.json        = many WorldLogEntry per cycle (the daybook)
+// ---------------------------------------------------------------------------
+
+export type WorldLogVisibility = "internal" | "public" | "mixed";
+
+/**
+ * Where in the world this beat is happening. Orthogonal to visibility.
+ *
+ *  - company:       inside Tallea (decisions, conversations, internal shifts)
+ *  - around:        around Tallea (specific external entities directly
+ *                   engaging — Veta, Casa Nimbo, beta users, named outlets)
+ *  - ecosystem:     wider ambient world (market sentiment, category drift,
+ *                   competitor moves, investor chatter, regional context)
+ *  - carry_forward: latent consequences and what this changes next
+ */
+export type WorldLogLayer = "company" | "around" | "ecosystem" | "carry_forward";
+
+export type WorldLogKind =
+  | "decision"
+  | "conversation"
+  | "merchant_signal"
+  | "product_change"
+  | "trust_signal"
+  | "press_signal"
+  | "internal_shift"
+  | "operational"
+  | "consequence"
+  // Ambient/world-motion kinds
+  | "external_entity_motion"
+  | "market_drift"
+  | "category_pressure"
+  | "public_misreading"
+  | "carry_forward";
+
+export type WorldLogDomain = PendingConsequence["domain"];
+
+/**
+ * A single entry in the world log / daybook.
+ * Persisted append-only in data/log.json.
+ */
+export interface WorldLogEntry {
+  id: string; // `${cycle_id}_log_${idx}` — stable per cycle
+  cycle_id: string;
+  day: number;
+  kind: WorldLogKind;
+  layer: WorldLogLayer;
+  visibility: WorldLogVisibility;
+  summary: string;
+  actors?: string[];
+  domain?: WorldLogDomain;
+  source: "derived" | "model"; // baseline derivation vs orchestrator-attached
+}
+
+/**
+ * Shape the orchestrator (mock or AI) may attach to a CycleOutput.
+ * The publishing layer assigns id/cycle_id/day before persisting.
+ */
+export interface CycleLogEntryInput {
+  kind: WorldLogKind;
+  layer: WorldLogLayer;
+  visibility: WorldLogVisibility;
+  summary: string;
+  actors?: string[];
+  domain?: WorldLogDomain;
+}
+
+// ---------------------------------------------------------------------------
+// Generation metadata (per-cycle observability of mock vs ai vs fallback)
+//
+// Records what actually ran during cycle generation, independent of the
+// env vars at the moment any page renders later. Resolves the gap where
+// a silent AI failure used to look identical to a successful AI run.
+//
+//   actual_mode === "ai"               → AI generation succeeded
+//   actual_mode === "mock"             → AI mode was off; mock template ran
+//   actual_mode === "fallback_to_mock" → AI mode was on; AI threw; mock ran
+//
+// Persisted in data/generation_log.json. Reset clears it.
+// ---------------------------------------------------------------------------
+
+export type GenerationProvider = "gateway" | "openai" | "mock";
+
+export interface GenerationMetadata {
+  cycle_id: string;
+  day: number;
+  generated_at: string; // ISO timestamp
+  actual_mode: "ai" | "mock" | "fallback_to_mock";
+  env_mode: "ai" | "mock";
+  provider?: GenerationProvider; // optional for legacy generation_log records
+  model?: string; // present for ai and fallback_to_mock
+  temperature?: number; // present for ai and fallback_to_mock
+  duration_ms: number;
+  fallback_reason?: string; // present only for fallback_to_mock
+  title: string; // for spot-checking against canonical mock titles
 }
 
 // ---------------------------------------------------------------------------

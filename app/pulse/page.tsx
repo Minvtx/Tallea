@@ -26,10 +26,14 @@ function formatRelative(iso: string | null): string | null {
 }
 
 export default async function PulsePage() {
-  const world = await loadCurrentWorldState();
-  const latestCycle = loadLatestCycleOutput();
-  const cycleCount = listCycleOutputFiles().length;
-  const updatedLabel = formatRelative(getLastUpdatedAt());
+  const [world, latestCycle, cycleFiles, lastUpdatedAt] = await Promise.all([
+    loadCurrentWorldState(),
+    loadLatestCycleOutput(),
+    listCycleOutputFiles(),
+    getLastUpdatedAt(),
+  ]);
+  const cycleCount = cycleFiles.length;
+  const updatedLabel = formatRelative(lastUpdatedAt);
 
   if (!world) {
     return (
