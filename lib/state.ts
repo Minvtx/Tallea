@@ -3,6 +3,7 @@ import path from "node:path";
 import type {
   CleanupBurden,
   CycleOutput,
+  GenerationMetadata,
   InternalAlignment,
   MerchantPipelineStatus,
   PublicLegitimacy,
@@ -16,8 +17,10 @@ import {
   applyDelta,
   CURRENT_STATE_PATH,
   CYCLES_DIR,
+  GENERATION_LOG_PATH,
   LOG_PATH,
   TIMELINE_PATH,
+  loadGenerationLog,
   loadTimeline,
   loadWorldLog,
 } from "@/lib/loaders";
@@ -245,6 +248,16 @@ export function applyAndPersistCycle(
 }
 
 /**
+ * Append a per-cycle GenerationMetadata record to data/generation_log.json.
+ * Idempotent under reruns of the same cycle_id (replaces in place).
+ */
+export function appendGenerationMetadata(meta: GenerationMetadata): void {
+  const existing = loadGenerationLog();
+  const filtered = existing.filter((m) => m.cycle_id !== meta.cycle_id);
+  writeJson(GENERATION_LOG_PATH, [...filtered, meta]);
+}
+
+/**
  * Reset persisted runtime state. Canon, runtime, and seed are never touched.
  * Idempotent.
  */
@@ -261,6 +274,11 @@ export function resetWorldState(): void {
   }
   try {
     if (fs.existsSync(LOG_PATH)) fs.unlinkSync(LOG_PATH);
+  } catch {
+    // ignore
+  }
+  try {
+    if (fs.existsSync(GENERATION_LOG_PATH)) fs.unlinkSync(GENERATION_LOG_PATH);
   } catch {
     // ignore
   }

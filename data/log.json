@@ -4,6 +4,7 @@
     "cycle_id": "cycle_001",
     "day": 1,
     "kind": "merchant_signal",
+    "layer": "around",
     "visibility": "mixed",
     "summary": "Veta agrees to a closed pilot on fitted tops and trousers, asking Tallea to handle catalog cleanup inside two weeks.",
     "actors": [
@@ -20,6 +21,7 @@
     "cycle_id": "cycle_001",
     "day": 1,
     "kind": "decision",
+    "layer": "company",
     "visibility": "internal",
     "summary": "Narrow live scope to fitted tops; trousers run as a hidden internal validation track behind the demo.",
     "actors": [
@@ -35,9 +37,13 @@
     "id": "cycle_001_log_02",
     "cycle_id": "cycle_001",
     "day": 1,
-    "kind": "merchant_signal",
-    "visibility": "mixed",
-    "summary": "Tallea has a real merchant in motion. Cleanup capacity becomes the binding constraint of the next two weeks.",
+    "kind": "internal_shift",
+    "layer": "company",
+    "visibility": "internal",
+    "summary": "Took ownership of Veta catalog cleanup under deadline.",
+    "actors": [
+      "rafaela_peralta"
+    ],
     "source": "derived"
   },
   {
@@ -45,11 +51,10 @@
     "cycle_id": "cycle_001",
     "day": 1,
     "kind": "internal_shift",
+    "layer": "company",
     "visibility": "internal",
-    "summary": "Matias and Nicolas leave the room without resolving how to talk publicly about the trousers track.",
+    "summary": "Pushed back on trousers being in scope.",
     "actors": [
-      "nicolas_bianchi",
-      "rafaela_peralta",
       "matias_roldan"
     ],
     "source": "derived"
@@ -58,26 +63,100 @@
     "id": "cycle_001_log_04",
     "cycle_id": "cycle_001",
     "day": 1,
-    "kind": "consequence",
+    "kind": "conversation",
+    "layer": "company",
     "visibility": "internal",
-    "summary": "Veta pilot expects fast catalog ingestion that cleanup capacity cannot honestly meet.",
-    "domain": "merchant",
+    "summary": "Matias and Nicolas: unstable trust with open disagreement.",
+    "actors": [
+      "matias",
+      "nicolas"
+    ],
     "source": "derived"
   },
   {
     "id": "cycle_001_log_05",
     "cycle_id": "cycle_001",
     "day": 1,
+    "kind": "external_entity_motion",
+    "layer": "around",
+    "visibility": "mixed",
+    "summary": "Merchant Veta: now active pilot; tighter scope, real deadline.",
+    "actors": [
+      "veta"
+    ],
+    "source": "derived"
+  },
+  {
+    "id": "cycle_001_log_06",
+    "cycle_id": "cycle_001",
+    "day": 1,
     "kind": "operational",
+    "layer": "company",
     "visibility": "internal",
     "summary": "Manual catalog cleanup burden now sits at high.",
     "source": "derived"
+  },
+  {
+    "id": "cycle_001_log_07",
+    "cycle_id": "cycle_001",
+    "day": 1,
+    "kind": "carry_forward",
+    "layer": "carry_forward",
+    "visibility": "internal",
+    "summary": "Veta pilot expects fast catalog ingestion that cleanup capacity cannot honestly meet.",
+    "domain": "merchant",
+    "source": "derived"
+  },
+  {
+    "id": "cycle_001_log_08",
+    "cycle_id": "cycle_001",
+    "day": 1,
+    "kind": "external_entity_motion",
+    "layer": "around",
+    "visibility": "mixed",
+    "summary": "Veta's head of e-commerce forwards the pilot scope to two adjacent fitted-apparel founders in Palermo without copying Tallea.",
+    "actors": [
+      "veta"
+    ],
+    "source": "model"
+  },
+  {
+    "id": "cycle_001_log_09",
+    "cycle_id": "cycle_001",
+    "day": 1,
+    "kind": "category_pressure",
+    "layer": "ecosystem",
+    "visibility": "public",
+    "summary": "Argentine apparel returns conversation reappears in two operator newsletters this week — both blame catalog quality, not shopper behavior.",
+    "source": "model"
+  },
+  {
+    "id": "cycle_001_log_10",
+    "cycle_id": "cycle_001",
+    "day": 1,
+    "kind": "market_drift",
+    "layer": "ecosystem",
+    "visibility": "mixed",
+    "summary": "An LP-curious operator group chat asks whether anyone has seen a real apparel-fit pilot ship in Buenos Aires this year.",
+    "source": "model"
+  },
+  {
+    "id": "cycle_001_log_11",
+    "cycle_id": "cycle_001",
+    "day": 1,
+    "kind": "carry_forward",
+    "layer": "carry_forward",
+    "visibility": "internal",
+    "summary": "If Veta delivers their catalog inside two weeks, cleanup capacity becomes the next merchant's first impression.",
+    "domain": "merchant",
+    "source": "model"
   },
   {
     "id": "cycle_002_log_00",
     "cycle_id": "cycle_002",
     "day": 2,
     "kind": "merchant_signal",
+    "layer": "around",
     "visibility": "mixed",
     "summary": "Veta sends their catalog as a mix of spreadsheets, Instagram screenshots, and WhatsApp voice notes from their head seamstress.",
     "actors": [
@@ -92,6 +171,7 @@
     "cycle_id": "cycle_002",
     "day": 2,
     "kind": "decision",
+    "layer": "company",
     "visibility": "internal",
     "summary": "Absorb the cleanup. Privately log it as technical debt; publicly keep the demo language unchanged.",
     "actors": [
@@ -105,22 +185,26 @@
     "id": "cycle_002_log_02",
     "cycle_id": "cycle_002",
     "day": 2,
-    "kind": "conversation",
+    "kind": "internal_shift",
+    "layer": "company",
     "visibility": "internal",
-    "summary": "Demo will land on time. Internal cost has shifted entirely onto Rafaela's calendar.",
+    "summary": "Worked through the weekend to stage the demo dataset.",
+    "actors": [
+      "rafaela_peralta"
+    ],
     "source": "derived"
   },
   {
     "id": "cycle_002_log_03",
     "cycle_id": "cycle_002",
     "day": 2,
-    "kind": "internal_shift",
+    "kind": "conversation",
+    "layer": "company",
     "visibility": "internal",
-    "summary": "Rafaela is now the single point of failure for the pilot, and the company's own automation story has quietly drifted further from reality.",
+    "summary": "Nicolas and Rafaela: dependency more visible resentment rising.",
     "actors": [
-      "rafaela_peralta",
-      "matias_roldan",
-      "nicolas_bianchi"
+      "nicolas",
+      "rafaela"
     ],
     "source": "derived"
   },
@@ -128,26 +212,73 @@
     "id": "cycle_002_log_04",
     "cycle_id": "cycle_002",
     "day": 2,
-    "kind": "consequence",
+    "kind": "operational",
+    "layer": "company",
     "visibility": "internal",
-    "summary": "Manual cleanup absorbed by Rafaela hides the absence of repeatable ingestion tooling.",
-    "domain": "product",
+    "summary": "Manual catalog cleanup burden now sits at unsustainable.",
     "source": "derived"
   },
   {
     "id": "cycle_002_log_05",
     "cycle_id": "cycle_002",
     "day": 2,
-    "kind": "operational",
+    "kind": "carry_forward",
+    "layer": "carry_forward",
     "visibility": "internal",
-    "summary": "Manual catalog cleanup burden now sits at unsustainable.",
+    "summary": "Manual cleanup absorbed by Rafaela hides the absence of repeatable ingestion tooling.",
+    "domain": "product",
     "source": "derived"
+  },
+  {
+    "id": "cycle_002_log_06",
+    "cycle_id": "cycle_002",
+    "day": 2,
+    "kind": "external_entity_motion",
+    "layer": "around",
+    "visibility": "mixed",
+    "summary": "Veta's seamstress sends two voice notes after midnight clarifying measurements her spreadsheet got wrong.",
+    "actors": [
+      "veta"
+    ],
+    "source": "model"
+  },
+  {
+    "id": "cycle_002_log_07",
+    "cycle_id": "cycle_002",
+    "day": 2,
+    "kind": "category_pressure",
+    "layer": "ecosystem",
+    "visibility": "public",
+    "summary": "Two Buenos Aires fitted-denim brands publicly complain about return rates this week. Neither mentions catalog quality.",
+    "source": "model"
+  },
+  {
+    "id": "cycle_002_log_08",
+    "cycle_id": "cycle_002",
+    "day": 2,
+    "kind": "market_drift",
+    "layer": "ecosystem",
+    "visibility": "public",
+    "summary": "MercadoShops releases a generic size-guide widget update. Operator chats read it as defensive against fit-tech upstarts.",
+    "source": "model"
+  },
+  {
+    "id": "cycle_002_log_09",
+    "cycle_id": "cycle_002",
+    "day": 2,
+    "kind": "carry_forward",
+    "layer": "carry_forward",
+    "visibility": "internal",
+    "summary": "Rafaela becomes a single point of failure for the pilot. The next investor question about ingestion will land here.",
+    "domain": "product",
+    "source": "model"
   },
   {
     "id": "cycle_003_log_00",
     "cycle_id": "cycle_003",
     "day": 3,
     "kind": "merchant_signal",
+    "layer": "around",
     "visibility": "mixed",
     "summary": "Casa Nimbo formalizes a white-label proposal: Tallea fit guidance shipped under their UI, with multi-merchant economics attached.",
     "actors": [
@@ -163,6 +294,7 @@
     "cycle_id": "cycle_003",
     "day": 3,
     "kind": "decision",
+    "layer": "company",
     "visibility": "internal",
     "summary": "Counter with a co-branded structure that preserves a Tallea-visible surface inside Casa Nimbo's UI.",
     "actors": [
@@ -177,9 +309,13 @@
     "id": "cycle_003_log_02",
     "cycle_id": "cycle_003",
     "day": 3,
-    "kind": "conversation",
+    "kind": "internal_shift",
+    "layer": "company",
     "visibility": "internal",
-    "summary": "The deal is alive but smaller. Internal alignment is now openly split.",
+    "summary": "Spent two days with Casa Nimbo.",
+    "actors": [
+      "lucia_ferrer"
+    ],
     "source": "derived"
   },
   {
@@ -187,11 +323,10 @@
     "cycle_id": "cycle_003",
     "day": 3,
     "kind": "internal_shift",
+    "layer": "company",
     "visibility": "internal",
-    "summary": "Camila is meaningfully less aligned with Lucia than yesterday. The team has named the identity question out loud for the first time.",
+    "summary": "Wrote a memo arguing white-label kills the user promise.",
     "actors": [
-      "lucia_ferrer",
-      "nicolas_bianchi",
       "camila_sosa"
     ],
     "source": "derived"
@@ -200,17 +335,104 @@
     "id": "cycle_003_log_04",
     "cycle_id": "cycle_003",
     "day": 3,
-    "kind": "consequence",
+    "kind": "conversation",
+    "layer": "company",
+    "visibility": "internal",
+    "summary": "Camila and Nicolas: openly strained.",
+    "actors": [
+      "camila",
+      "nicolas"
+    ],
+    "source": "derived"
+  },
+  {
+    "id": "cycle_003_log_05",
+    "cycle_id": "cycle_003",
+    "day": 3,
+    "kind": "conversation",
+    "layer": "company",
+    "visibility": "internal",
+    "summary": "Lucia and Camila: trust under visible strain.",
+    "actors": [
+      "lucia",
+      "camila"
+    ],
+    "source": "derived"
+  },
+  {
+    "id": "cycle_003_log_06",
+    "cycle_id": "cycle_003",
+    "day": 3,
+    "kind": "external_entity_motion",
+    "layer": "ecosystem",
+    "visibility": "public",
+    "summary": "Operator Casa Nimbo: now formal white label proposal; infrastructure path with attractive economics.",
+    "actors": [
+      "casa_nimbo"
+    ],
+    "source": "derived"
+  },
+  {
+    "id": "cycle_003_log_07",
+    "cycle_id": "cycle_003",
+    "day": 3,
+    "kind": "carry_forward",
+    "layer": "carry_forward",
     "visibility": "internal",
     "summary": "If Casa Nimbo is accepted, the public site will need to be rewritten or quietly downgraded.",
     "domain": "strategy",
     "source": "derived"
   },
   {
+    "id": "cycle_003_log_08",
+    "cycle_id": "cycle_003",
+    "day": 3,
+    "kind": "external_entity_motion",
+    "layer": "around",
+    "visibility": "mixed",
+    "summary": "Casa Nimbo's product lead schedules a follow-up the same week and asks whether Tallea's name would appear in the URL.",
+    "actors": [
+      "casa_nimbo"
+    ],
+    "source": "model"
+  },
+  {
+    "id": "cycle_003_log_09",
+    "cycle_id": "cycle_003",
+    "day": 3,
+    "kind": "market_drift",
+    "layer": "ecosystem",
+    "visibility": "public",
+    "summary": "Latin American DTC apparel funding tightens another notch. Two regional white-label vendors put out case studies the same afternoon.",
+    "source": "model"
+  },
+  {
+    "id": "cycle_003_log_10",
+    "cycle_id": "cycle_003",
+    "day": 3,
+    "kind": "category_pressure",
+    "layer": "ecosystem",
+    "visibility": "mixed",
+    "summary": "An operator angel pings Lucia privately to argue that infrastructure is the only durable apparel-tech moat in this region.",
+    "source": "model"
+  },
+  {
+    "id": "cycle_003_log_11",
+    "cycle_id": "cycle_003",
+    "day": 3,
+    "kind": "carry_forward",
+    "layer": "carry_forward",
+    "visibility": "internal",
+    "summary": "If Casa Nimbo accepts the counter, the homepage will need a structural rewrite within two cycles. If they decline, Camila's user-promise memo becomes the de facto strategy doc.",
+    "domain": "strategy",
+    "source": "model"
+  },
+  {
     "id": "cycle_004_log_00",
     "cycle_id": "cycle_004",
     "day": 4,
     "kind": "merchant_signal",
+    "layer": "around",
     "visibility": "mixed",
     "summary": "Veta sends their catalog as a mix of spreadsheets, Instagram screenshots, and WhatsApp voice notes from their head seamstress.",
     "actors": [
@@ -225,6 +447,7 @@
     "cycle_id": "cycle_004",
     "day": 4,
     "kind": "decision",
+    "layer": "company",
     "visibility": "internal",
     "summary": "Absorb the cleanup. Privately log it as technical debt; publicly keep the demo language unchanged.",
     "actors": [
@@ -238,22 +461,26 @@
     "id": "cycle_004_log_02",
     "cycle_id": "cycle_004",
     "day": 4,
-    "kind": "conversation",
+    "kind": "internal_shift",
+    "layer": "company",
     "visibility": "internal",
-    "summary": "Demo will land on time. Internal cost has shifted entirely onto Rafaela's calendar.",
+    "summary": "Worked through the weekend to stage the demo dataset.",
+    "actors": [
+      "rafaela_peralta"
+    ],
     "source": "derived"
   },
   {
     "id": "cycle_004_log_03",
     "cycle_id": "cycle_004",
     "day": 4,
-    "kind": "internal_shift",
+    "kind": "conversation",
+    "layer": "company",
     "visibility": "internal",
-    "summary": "Rafaela is now the single point of failure for the pilot, and the company's own automation story has quietly drifted further from reality.",
+    "summary": "Nicolas and Rafaela: dependency more visible resentment rising.",
     "actors": [
-      "rafaela_peralta",
-      "matias_roldan",
-      "nicolas_bianchi"
+      "nicolas",
+      "rafaela"
     ],
     "source": "derived"
   },
@@ -261,26 +488,73 @@
     "id": "cycle_004_log_04",
     "cycle_id": "cycle_004",
     "day": 4,
-    "kind": "consequence",
+    "kind": "operational",
+    "layer": "company",
     "visibility": "internal",
-    "summary": "Manual cleanup absorbed by Rafaela hides the absence of repeatable ingestion tooling.",
-    "domain": "product",
+    "summary": "Manual catalog cleanup burden now sits at unsustainable.",
     "source": "derived"
   },
   {
     "id": "cycle_004_log_05",
     "cycle_id": "cycle_004",
     "day": 4,
-    "kind": "operational",
+    "kind": "carry_forward",
+    "layer": "carry_forward",
     "visibility": "internal",
-    "summary": "Manual catalog cleanup burden now sits at unsustainable.",
+    "summary": "Manual cleanup absorbed by Rafaela hides the absence of repeatable ingestion tooling.",
+    "domain": "product",
     "source": "derived"
+  },
+  {
+    "id": "cycle_004_log_06",
+    "cycle_id": "cycle_004",
+    "day": 4,
+    "kind": "external_entity_motion",
+    "layer": "around",
+    "visibility": "mixed",
+    "summary": "Veta's seamstress sends two voice notes after midnight clarifying measurements her spreadsheet got wrong.",
+    "actors": [
+      "veta"
+    ],
+    "source": "model"
+  },
+  {
+    "id": "cycle_004_log_07",
+    "cycle_id": "cycle_004",
+    "day": 4,
+    "kind": "category_pressure",
+    "layer": "ecosystem",
+    "visibility": "public",
+    "summary": "Two Buenos Aires fitted-denim brands publicly complain about return rates this week. Neither mentions catalog quality.",
+    "source": "model"
+  },
+  {
+    "id": "cycle_004_log_08",
+    "cycle_id": "cycle_004",
+    "day": 4,
+    "kind": "market_drift",
+    "layer": "ecosystem",
+    "visibility": "public",
+    "summary": "MercadoShops releases a generic size-guide widget update. Operator chats read it as defensive against fit-tech upstarts.",
+    "source": "model"
+  },
+  {
+    "id": "cycle_004_log_09",
+    "cycle_id": "cycle_004",
+    "day": 4,
+    "kind": "carry_forward",
+    "layer": "carry_forward",
+    "visibility": "internal",
+    "summary": "Rafaela becomes a single point of failure for the pilot. The next investor question about ingestion will land here.",
+    "domain": "product",
+    "source": "model"
   },
   {
     "id": "cycle_005_log_00",
     "cycle_id": "cycle_005",
     "day": 5,
     "kind": "merchant_signal",
+    "layer": "around",
     "visibility": "mixed",
     "summary": "Casa Nimbo formalizes a white-label proposal: Tallea fit guidance shipped under their UI, with multi-merchant economics attached.",
     "actors": [
@@ -296,6 +570,7 @@
     "cycle_id": "cycle_005",
     "day": 5,
     "kind": "decision",
+    "layer": "company",
     "visibility": "internal",
     "summary": "Counter with a co-branded structure that preserves a Tallea-visible surface inside Casa Nimbo's UI.",
     "actors": [
@@ -310,9 +585,13 @@
     "id": "cycle_005_log_02",
     "cycle_id": "cycle_005",
     "day": 5,
-    "kind": "conversation",
+    "kind": "internal_shift",
+    "layer": "company",
     "visibility": "internal",
-    "summary": "The deal is alive but smaller. Internal alignment is now openly split.",
+    "summary": "Spent two days with Casa Nimbo.",
+    "actors": [
+      "lucia_ferrer"
+    ],
     "source": "derived"
   },
   {
@@ -320,11 +599,10 @@
     "cycle_id": "cycle_005",
     "day": 5,
     "kind": "internal_shift",
+    "layer": "company",
     "visibility": "internal",
-    "summary": "Camila is meaningfully less aligned with Lucia than yesterday. The team has named the identity question out loud for the first time.",
+    "summary": "Wrote a memo arguing white-label kills the user promise.",
     "actors": [
-      "lucia_ferrer",
-      "nicolas_bianchi",
       "camila_sosa"
     ],
     "source": "derived"
@@ -333,17 +611,104 @@
     "id": "cycle_005_log_04",
     "cycle_id": "cycle_005",
     "day": 5,
-    "kind": "consequence",
+    "kind": "conversation",
+    "layer": "company",
+    "visibility": "internal",
+    "summary": "Camila and Nicolas: openly strained.",
+    "actors": [
+      "camila",
+      "nicolas"
+    ],
+    "source": "derived"
+  },
+  {
+    "id": "cycle_005_log_05",
+    "cycle_id": "cycle_005",
+    "day": 5,
+    "kind": "conversation",
+    "layer": "company",
+    "visibility": "internal",
+    "summary": "Lucia and Camila: trust under visible strain.",
+    "actors": [
+      "lucia",
+      "camila"
+    ],
+    "source": "derived"
+  },
+  {
+    "id": "cycle_005_log_06",
+    "cycle_id": "cycle_005",
+    "day": 5,
+    "kind": "external_entity_motion",
+    "layer": "ecosystem",
+    "visibility": "public",
+    "summary": "Operator Casa Nimbo: now formal white label proposal; infrastructure path with attractive economics.",
+    "actors": [
+      "casa_nimbo"
+    ],
+    "source": "derived"
+  },
+  {
+    "id": "cycle_005_log_07",
+    "cycle_id": "cycle_005",
+    "day": 5,
+    "kind": "carry_forward",
+    "layer": "carry_forward",
     "visibility": "internal",
     "summary": "If Casa Nimbo is accepted, the public site will need to be rewritten or quietly downgraded.",
     "domain": "strategy",
     "source": "derived"
   },
   {
+    "id": "cycle_005_log_08",
+    "cycle_id": "cycle_005",
+    "day": 5,
+    "kind": "external_entity_motion",
+    "layer": "around",
+    "visibility": "mixed",
+    "summary": "Casa Nimbo's product lead schedules a follow-up the same week and asks whether Tallea's name would appear in the URL.",
+    "actors": [
+      "casa_nimbo"
+    ],
+    "source": "model"
+  },
+  {
+    "id": "cycle_005_log_09",
+    "cycle_id": "cycle_005",
+    "day": 5,
+    "kind": "market_drift",
+    "layer": "ecosystem",
+    "visibility": "public",
+    "summary": "Latin American DTC apparel funding tightens another notch. Two regional white-label vendors put out case studies the same afternoon.",
+    "source": "model"
+  },
+  {
+    "id": "cycle_005_log_10",
+    "cycle_id": "cycle_005",
+    "day": 5,
+    "kind": "category_pressure",
+    "layer": "ecosystem",
+    "visibility": "mixed",
+    "summary": "An operator angel pings Lucia privately to argue that infrastructure is the only durable apparel-tech moat in this region.",
+    "source": "model"
+  },
+  {
+    "id": "cycle_005_log_11",
+    "cycle_id": "cycle_005",
+    "day": 5,
+    "kind": "carry_forward",
+    "layer": "carry_forward",
+    "visibility": "internal",
+    "summary": "If Casa Nimbo accepts the counter, the homepage will need a structural rewrite within two cycles. If they decline, Camila's user-promise memo becomes the de facto strategy doc.",
+    "domain": "strategy",
+    "source": "model"
+  },
+  {
     "id": "cycle_006_log_00",
     "cycle_id": "cycle_006",
     "day": 6,
     "kind": "merchant_signal",
+    "layer": "around",
     "visibility": "mixed",
     "summary": "Veta sends their catalog as a mix of spreadsheets, Instagram screenshots, and WhatsApp voice notes from their head seamstress.",
     "actors": [
@@ -358,6 +723,7 @@
     "cycle_id": "cycle_006",
     "day": 6,
     "kind": "decision",
+    "layer": "company",
     "visibility": "internal",
     "summary": "Absorb the cleanup. Privately log it as technical debt; publicly keep the demo language unchanged.",
     "actors": [
@@ -371,22 +737,26 @@
     "id": "cycle_006_log_02",
     "cycle_id": "cycle_006",
     "day": 6,
-    "kind": "conversation",
+    "kind": "internal_shift",
+    "layer": "company",
     "visibility": "internal",
-    "summary": "Demo will land on time. Internal cost has shifted entirely onto Rafaela's calendar.",
+    "summary": "Worked through the weekend to stage the demo dataset.",
+    "actors": [
+      "rafaela_peralta"
+    ],
     "source": "derived"
   },
   {
     "id": "cycle_006_log_03",
     "cycle_id": "cycle_006",
     "day": 6,
-    "kind": "internal_shift",
+    "kind": "conversation",
+    "layer": "company",
     "visibility": "internal",
-    "summary": "Rafaela is now the single point of failure for the pilot, and the company's own automation story has quietly drifted further from reality.",
+    "summary": "Nicolas and Rafaela: dependency more visible resentment rising.",
     "actors": [
-      "rafaela_peralta",
-      "matias_roldan",
-      "nicolas_bianchi"
+      "nicolas",
+      "rafaela"
     ],
     "source": "derived"
   },
@@ -394,19 +764,65 @@
     "id": "cycle_006_log_04",
     "cycle_id": "cycle_006",
     "day": 6,
-    "kind": "consequence",
+    "kind": "operational",
+    "layer": "company",
     "visibility": "internal",
-    "summary": "Manual cleanup absorbed by Rafaela hides the absence of repeatable ingestion tooling.",
-    "domain": "product",
+    "summary": "Manual catalog cleanup burden now sits at unsustainable.",
     "source": "derived"
   },
   {
     "id": "cycle_006_log_05",
     "cycle_id": "cycle_006",
     "day": 6,
-    "kind": "operational",
+    "kind": "carry_forward",
+    "layer": "carry_forward",
     "visibility": "internal",
-    "summary": "Manual catalog cleanup burden now sits at unsustainable.",
+    "summary": "Manual cleanup absorbed by Rafaela hides the absence of repeatable ingestion tooling.",
+    "domain": "product",
     "source": "derived"
+  },
+  {
+    "id": "cycle_006_log_06",
+    "cycle_id": "cycle_006",
+    "day": 6,
+    "kind": "external_entity_motion",
+    "layer": "around",
+    "visibility": "mixed",
+    "summary": "Veta's seamstress sends two voice notes after midnight clarifying measurements her spreadsheet got wrong.",
+    "actors": [
+      "veta"
+    ],
+    "source": "model"
+  },
+  {
+    "id": "cycle_006_log_07",
+    "cycle_id": "cycle_006",
+    "day": 6,
+    "kind": "category_pressure",
+    "layer": "ecosystem",
+    "visibility": "public",
+    "summary": "Two Buenos Aires fitted-denim brands publicly complain about return rates this week. Neither mentions catalog quality.",
+    "source": "model"
+  },
+  {
+    "id": "cycle_006_log_08",
+    "cycle_id": "cycle_006",
+    "day": 6,
+    "kind": "market_drift",
+    "layer": "ecosystem",
+    "visibility": "public",
+    "summary": "MercadoShops releases a generic size-guide widget update. Operator chats read it as defensive against fit-tech upstarts.",
+    "source": "model"
+  },
+  {
+    "id": "cycle_006_log_09",
+    "cycle_id": "cycle_006",
+    "day": 6,
+    "kind": "carry_forward",
+    "layer": "carry_forward",
+    "visibility": "internal",
+    "summary": "Rafaela becomes a single point of failure for the pilot. The next investor question about ingestion will land here.",
+    "domain": "product",
+    "source": "model"
   }
 ]

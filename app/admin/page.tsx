@@ -3,6 +3,7 @@ import {
   listCycleOutputFiles,
   loadCurrentWorldState,
   loadLatestCycleOutput,
+  loadLatestGeneration,
   loadTimeline,
   loadWorldLog,
 } from "@/lib/loaders";
@@ -36,6 +37,7 @@ export default async function AdminPage() {
   const updatedLabel = formatRelative(getLastUpdatedAt());
   const modeStatus = getCycleModeStatus();
   const mode = modeStatus.mode;
+  const lastGen = loadLatestGeneration();
 
   return (
     <div className="mx-auto max-w-5xl px-6 pt-12 pb-24">
@@ -109,6 +111,70 @@ export default async function AdminPage() {
           </p>
         )}
       </section>
+
+      {/* Last generation: what actually ran on the most recent cycle */}
+      {lastGen ? (
+        <section className="mt-8 border hairline rounded-md p-4">
+          <p className="eyebrow mb-3">Last generation</p>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[12px] tabular eyebrow">
+            <span className="flex items-center gap-2">
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${
+                  lastGen.actual_mode === "ai"
+                    ? "bg-accent"
+                    : lastGen.actual_mode === "fallback_to_mock"
+                      ? "bg-foreground"
+                      : "bg-foreground/55"
+                }`}
+                aria-hidden
+              />
+              {lastGen.actual_mode === "fallback_to_mock"
+                ? "FALLBACK TO MOCK"
+                : lastGen.actual_mode.toUpperCase()}
+            </span>
+            <span>·</span>
+            <span>{lastGen.cycle_id.toUpperCase()}</span>
+            <span>·</span>
+            <span>DAY {String(lastGen.day).padStart(3, "0")}</span>
+            {lastGen.model ? (
+              <>
+                <span>·</span>
+                <span>MODEL {lastGen.model}</span>
+              </>
+            ) : null}
+            {typeof lastGen.temperature === "number" ? (
+              <>
+                <span>·</span>
+                <span>TEMP {lastGen.temperature}</span>
+              </>
+            ) : null}
+            <span>·</span>
+            <span>{(lastGen.duration_ms / 1000).toFixed(2)}S</span>
+            <span>·</span>
+            <span>{formatRelative(lastGen.generated_at).toUpperCase()}</span>
+          </div>
+          <p className="text-[12px] text-muted mt-3 leading-relaxed">
+            <span className="eyebrow text-[10px] mr-2">Title</span>
+            {lastGen.title}
+          </p>
+          {lastGen.actual_mode === "fallback_to_mock" &&
+          lastGen.fallback_reason ? (
+            <p className="text-[12px] text-muted mt-3 leading-relaxed max-w-2xl">
+              <span className="eyebrow text-[10px] mr-2">Fallback reason</span>
+              <code className="text-foreground/85 break-words">
+                {lastGen.fallback_reason}
+              </code>
+            </p>
+          ) : null}
+          {lastGen.actual_mode === "mock" && mode === "ai" ? (
+            <p className="text-[12px] text-muted mt-3 leading-relaxed max-w-2xl">
+              Note: the env now says AI mode, but the most recent cycle ran
+              under mock mode (likely before the flag was flipped). Run a new
+              cycle to get an AI-generated one.
+            </p>
+          ) : null}
+        </section>
+      ) : null}
 
       {/* Current position */}
       {world ? (

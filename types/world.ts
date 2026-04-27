@@ -362,6 +362,33 @@ export interface CycleLogEntryInput {
 }
 
 // ---------------------------------------------------------------------------
+// Generation metadata (per-cycle observability of mock vs ai vs fallback)
+//
+// Records what actually ran during cycle generation, independent of the
+// env vars at the moment any page renders later. Resolves the gap where
+// a silent AI failure used to look identical to a successful AI run.
+//
+//   actual_mode === "ai"               → AI generation succeeded
+//   actual_mode === "mock"             → AI mode was off; mock template ran
+//   actual_mode === "fallback_to_mock" → AI mode was on; AI threw; mock ran
+//
+// Persisted append-only in data/generation_log.json. Reset clears it.
+// ---------------------------------------------------------------------------
+
+export interface GenerationMetadata {
+  cycle_id: string;
+  day: number;
+  generated_at: string; // ISO timestamp
+  actual_mode: "ai" | "mock" | "fallback_to_mock";
+  env_mode: "ai" | "mock";
+  model?: string; // present for ai and fallback_to_mock
+  temperature?: number; // present for ai and fallback_to_mock
+  duration_ms: number;
+  fallback_reason?: string; // present only for fallback_to_mock
+  title: string; // for spot-checking against canonical mock titles
+}
+
+// ---------------------------------------------------------------------------
 // Timeline (compact append-only log for /timeline page)
 // ---------------------------------------------------------------------------
 

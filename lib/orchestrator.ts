@@ -29,6 +29,7 @@
 
 import type {
   CycleOutput,
+  GenerationMetadata,
   PendingConsequence,
   SiteProjection,
   TimelineEvent,
@@ -47,7 +48,11 @@ import {
   loadTimeline,
   loadWorldRules,
 } from "@/lib/loaders";
-import { applyAndPersistCycle, writeCycleOutput } from "@/lib/state";
+import {
+  appendGenerationMetadata,
+  applyAndPersistCycle,
+  writeCycleOutput,
+} from "@/lib/state";
 import { deriveProjection } from "@/lib/publisher";
 
 // ---------------------------------------------------------------------------
@@ -254,6 +259,17 @@ async function generateWithAI(ctx: CycleContext): Promise<CycleOutput> {
     "- Honor canonical realism: most cycles advance a thread rather than concluding one; public narrative lags internal state; pressure usually accumulates rather than resolves; a signal is more honest than a result.",
     "- Forbidden single-cycle moves unless the recent timeline explicitly built up to them: instant signed paid pilots, public_legitimacy jumps of more than one step, runway_pressure jumps of more than one step, internal_alignment jumps of more than one step, press explosions, acquisition rumors, large fundraising, full repair of openly-strained relationships.",
     "- The state_updates delta must touch at least one character and at least one strategic field. Add at least one pending_consequence unless none would be honest.",
+    "",
+    "Distinctiveness — important:",
+    "- The runtime contains a small set of canonical mock-mode templates used when AI generation is disabled. When YOU are generating, your output must be visibly distinguishable from those templates. Do NOT reuse any of these exact mock-mode titles verbatim:",
+    "    * \"Veta says yes, with a deadline\"",
+    "    * \"The catalog arrives, and it is a mess\"",
+    "    * \"A newsletter calls Tallea 'AI sizing'\"",
+    "    * \"Casa Nimbo wants Tallea behind their brand\"",
+    "    * \"The team finally says it out loud\"",
+    "    * \"Beta users hesitate at the body-profile flow\"",
+    "- The world is bigger than these specific beats. The event_types catalog is reference, not a menu. If the day's most honest beat happens to map to one of the mock themes, choose a different angle on it (different actor, different detail, different time of day, different framing) so the title is genuinely your own.",
+    "- Vary structure across cycles. Some cycles are conversations that almost happen. Some are quiet operational days where the most important thing is something nobody decides. Some are misreadings the team only catches later.",
     "",
     "About logEntries (the daybook):",
     "- The app already stores a one-line-per-cycle highlight timeline. logEntries is a complementary fuller daily record. The publisher derives baseline entries from the cycle delta (decisions, character shifts, external entity motion, public-layer changes, pending consequences). Your job is to ENRICH the daybook beyond what the delta already implies.",
@@ -1084,18 +1100,75 @@ function generateMock(ctx: CycleContext): CycleOutput {
 // Public entry points
 // ---------------------------------------------------------------------------
 
+/**
+ * Per-cycle generation result, including observability metadata that records
+ * what *actually* ran (not what env vars say). The metadata distinguishes
+ *   - "ai":               AI generation succeeded
+ *   - "mock":             AI mode was off; mock template ran
+ *   - "fallback_to_mock": AI mode was on; AI threw; mock ran
+ *
+ * This closes the previous gap where a silent AI failure was indistinguishable
+ * from a successful AI run from the admin UI / cron response.
+ */
+export interface GenerateResult {
+  cycle: CycleOutput;
+  /** Partial; the orchestrator fills cycle_id/day/title/generated_at on persist. */
+  metadata: Omit<
+    GenerationMetadata,
+    "cycle_id" | "day" | "title" | "generated_at"
+  >;
+}
+
 export async function generateCycleOutput(
   ctx: CycleContext,
-): Promise<CycleOutput> {
-  if (getCycleMode() === "ai") {
+): Promise<GenerateResult> {
+  const status = getCycleModeStatus();
+  const startedAt = Date.now();
+
+  if (status.mode === "ai") {
     try {
-      return await generateWithAI(ctx);
+      const cycle = await generateWithAI(ctx);
+      return {
+        cycle,
+        metadata: {
+          actual_mode: "ai",
+          env_mode: "ai",
+          model: status.model,
+          temperature: status.temperature,
+          duration_ms: Date.now() - startedAt,
+        },
+      };
     } catch (err) {
-      console.error("[orchestrator] AI generation failed, falling back to mock:", err);
-      return generateMock(ctx);
+      const fallbackReason =
+        err instanceof Error ? `${err.name}: ${err.message}` : "unknown error";
+      console.error(
+        "[orchestrator] AI generation failed, falling back to mock:",
+        err,
+      );
+      const cycle = generateMock(ctx);
+      return {
+        cycle,
+        metadata: {
+          actual_mode: "fallback_to_mock",
+          env_mode: "ai",
+          model: status.model,
+          temperature: status.temperature,
+          duration_ms: Date.now() - startedAt,
+          fallback_reason: fallbackReason,
+        },
+      };
     }
   }
-  return generateMock(ctx);
+
+  const cycle = generateMock(ctx);
+  return {
+    cycle,
+    metadata: {
+      actual_mode: "mock",
+      env_mode: "mock",
+      duration_ms: Date.now() - startedAt,
+    },
+  };
 }
 
 export interface RunCycleResult {
@@ -1104,12 +1177,13 @@ export interface RunCycleResult {
   timelineEvent: TimelineEvent;
   logEntries: WorldLogEntry[];
   projection: SiteProjection;
-  mode: CycleMode;
+  /** What actually ran for this cycle. Reflects fallback, not env. */
+  generation: GenerationMetadata;
 }
 
 /**
- * Run a single cycle: load state, generate, persist, project. Single entry
- * point for /admin and the cron route.
+ * Run a single cycle: load state, generate, persist, project, and record
+ * generation metadata. Single entry point for /admin and the cron route.
  *
  * Generation is the only step where the AI model is involved; everything
  * downstream (delta application, realism clamps, timeline, daybook,
@@ -1125,7 +1199,8 @@ export async function runWorldCycle(): Promise<RunCycleResult> {
   }
 
   const ctx = buildCycleContext(state);
-  const cycleOutput = await generateCycleOutput(ctx);
+  const { cycle: cycleOutput, metadata: partialMeta } =
+    await generateCycleOutput(ctx);
   writeCycleOutput(cycleOutput);
   const { nextState, timelineEvent, logEntries } = applyAndPersistCycle(
     state,
@@ -1133,12 +1208,31 @@ export async function runWorldCycle(): Promise<RunCycleResult> {
   );
   const projection = deriveProjection(nextState);
 
+  const generation: GenerationMetadata = {
+    cycle_id: cycleOutput.cycle_id,
+    day: cycleOutput.day,
+    generated_at: new Date().toISOString(),
+    title: cycleOutput.title,
+    ...partialMeta,
+  };
+  appendGenerationMetadata(generation);
+
+  console.log(
+    `[orchestrator] cycle=${cycleOutput.cycle_id} day=${cycleOutput.day} actual_mode=${generation.actual_mode}${
+      generation.model ? ` model=${generation.model}` : ""
+    } duration_ms=${generation.duration_ms}${
+      generation.fallback_reason
+        ? ` fallback_reason="${generation.fallback_reason}"`
+        : ""
+    }`,
+  );
+
   return {
     cycleOutput,
     nextState,
     timelineEvent,
     logEntries,
     projection,
-    mode: getCycleMode(),
+    generation,
   };
 }

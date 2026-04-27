@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type {
   CycleOutput,
+  GenerationMetadata,
   TimelineEvent,
   WorldLogEntry,
   WorldState,
@@ -21,6 +22,7 @@ export const CYCLES_DIR = path.join(DATA_DIR, "cycles");
 export const CURRENT_STATE_PATH = path.join(DATA_DIR, "current_state.json");
 export const TIMELINE_PATH = path.join(DATA_DIR, "timeline.json");
 export const LOG_PATH = path.join(DATA_DIR, "log.json");
+export const GENERATION_LOG_PATH = path.join(DATA_DIR, "generation_log.json");
 export const INITIAL_STATE_PATH = path.join(SEED_DIR, "initial_state.json");
 export const FIRST_CYCLE_SEED_PATH = path.join(SEED_DIR, "first_cycle_seed.md");
 export const RUNTIME_FOUNDATION_PATH = path.join(RUNTIME_DIR, "runtime_foundation.md");
@@ -195,6 +197,19 @@ export function loadTimeline(): TimelineEvent[] {
 
 export function loadWorldLog(): WorldLogEntry[] {
   return readJsonFile<WorldLogEntry[]>(LOG_PATH) ?? [];
+}
+
+// ---------------------------------------------------------------------------
+// Generation metadata loader (per-cycle: actual mode, model, duration, ...)
+// ---------------------------------------------------------------------------
+
+export function loadGenerationLog(): GenerationMetadata[] {
+  return readJsonFile<GenerationMetadata[]>(GENERATION_LOG_PATH) ?? [];
+}
+
+export function loadLatestGeneration(): GenerationMetadata | null {
+  const log = loadGenerationLog();
+  return log.length > 0 ? log[log.length - 1] : null;
 }
 
 // ---------------------------------------------------------------------------
