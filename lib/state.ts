@@ -9,15 +9,19 @@ import type {
   RunwayPressure,
   StrategicIdentity,
   TimelineEvent,
+  WorldLogEntry,
   WorldState,
 } from "@/types/world";
 import {
   applyDelta,
   CURRENT_STATE_PATH,
   CYCLES_DIR,
+  LOG_PATH,
   TIMELINE_PATH,
   loadTimeline,
+  loadWorldLog,
 } from "@/lib/loaders";
+import { deriveBaselineLogEntries, mergeCycleLogEntries } from "@/lib/log";
 
 function writeJson(p: string, data: unknown): void {
   fs.mkdirSync(path.dirname(p), { recursive: true });
@@ -182,13 +186,24 @@ export function writeCycleOutput(cycle: CycleOutput): string {
 }
 
 /**
- * Apply a cycle to the given state, persist current_state.json, and append a
- * compact TimelineEvent to timeline.json. Returns the resulting state.
+ * Apply a cycle to the given state, persist current_state.json, append a
+ * compact TimelineEvent to timeline.json, and append the derived
+ * WorldLogEntry[] for this cycle to log.json.
+ *
+ * Timeline = highlight per cycle. Log = fuller daybook per cycle.
+ *
+ * Log entries are derived deterministically from the CycleOutput. If the
+ * orchestrator attached `cycle.logEntries` (mock or AI), those are merged
+ * on top. There is no second LLM call.
  */
 export function applyAndPersistCycle(
   prevState: WorldState,
   cycle: CycleOutput,
-): { nextState: WorldState; timelineEvent: TimelineEvent } {
+): {
+  nextState: WorldState;
+  timelineEvent: TimelineEvent;
+  logEntries: WorldLogEntry[];
+} {
   const merged = applyDelta(prevState, cycle.state_updates);
   // Realism guardrails: prevent single-cycle teleport on key ladders.
   const nextState = clampStateTransitions(prevState, merged);
@@ -212,10 +227,21 @@ export function applyAndPersistCycle(
     primary_pressure: cycle.primary_pressure,
   };
 
-  const existing = loadTimeline();
-  writeJson(TIMELINE_PATH, [...existing, timelineEvent]);
+  const existingTimeline = loadTimeline();
+  writeJson(TIMELINE_PATH, [...existingTimeline, timelineEvent]);
 
-  return { nextState, timelineEvent };
+  // Daybook: derive baseline + merge any orchestrator-attached entries.
+  const baseline = deriveBaselineLogEntries(cycle, prevState);
+  const logEntries = mergeCycleLogEntries(cycle, baseline);
+
+  const existingLog = loadWorldLog();
+  // Re-runs of the same cycle_id should overwrite that cycle's entries
+  // rather than duplicate. This keeps the daybook idempotent under
+  // accidental double-runs.
+  const filtered = existingLog.filter((e) => e.cycle_id !== cycle.cycle_id);
+  writeJson(LOG_PATH, [...filtered, ...logEntries]);
+
+  return { nextState, timelineEvent, logEntries };
 }
 
 /**
@@ -230,6 +256,11 @@ export function resetWorldState(): void {
   }
   try {
     if (fs.existsSync(TIMELINE_PATH)) fs.unlinkSync(TIMELINE_PATH);
+  } catch {
+    // ignore
+  }
+  try {
+    if (fs.existsSync(LOG_PATH)) fs.unlinkSync(LOG_PATH);
   } catch {
     // ignore
   }

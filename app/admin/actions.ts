@@ -8,6 +8,7 @@ function revalidateAll() {
   revalidatePath("/");
   revalidatePath("/pulse");
   revalidatePath("/timeline");
+  revalidatePath("/daybook");
   revalidatePath("/admin");
 }
 

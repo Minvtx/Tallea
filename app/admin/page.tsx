@@ -4,8 +4,9 @@ import {
   loadCurrentWorldState,
   loadLatestCycleOutput,
   loadTimeline,
+  loadWorldLog,
 } from "@/lib/loaders";
-import { getCycleMode } from "@/lib/orchestrator";
+import { getCycleModeStatus } from "@/lib/orchestrator";
 import { AdminActionsPanel } from "@/components/admin-actions-panel";
 import { SectionCard, FieldRow } from "@/components/section-card";
 import { StatusBadge } from "@/components/status-badge";
@@ -31,8 +32,10 @@ export default async function AdminPage() {
   const latestCycle = loadLatestCycleOutput();
   const cycleCount = listCycleOutputFiles().length;
   const timelineCount = loadTimeline().length;
+  const logCount = loadWorldLog().length;
   const updatedLabel = formatRelative(getLastUpdatedAt());
-  const mode = getCycleMode();
+  const modeStatus = getCycleModeStatus();
+  const mode = modeStatus.mode;
 
   return (
     <div className="mx-auto max-w-5xl px-6 pt-12 pb-24">
@@ -66,6 +69,8 @@ export default async function AdminPage() {
         <span>·</span>
         <span>TIMELINE {String(timelineCount).padStart(2, "0")}</span>
         <span>·</span>
+        <span>DAYBOOK {String(logCount).padStart(3, "0")}</span>
+        <span>·</span>
         <span>UPDATED {updatedLabel.toUpperCase()}</span>
       </section>
 
@@ -76,16 +81,31 @@ export default async function AdminPage() {
         {mode === "mock" ? (
           <p className="text-[12px] text-muted mt-4 max-w-xl leading-relaxed">
             Running in <span className="text-foreground/85">mock mode</span>.
-            Cycles are produced by deterministic event templates. Set{" "}
-            <code className="text-foreground/85">TALLEA_ENABLE_AI=true</code>{" "}
-            and provide{" "}
-            <code className="text-foreground/85">AI_GATEWAY_API_KEY</code> to
-            switch to AI generation.
+            Cycles are produced by deterministic event templates.{" "}
+            {modeStatus.reason === "missing_enable_flag" ? (
+              <>
+                Set{" "}
+                <code className="text-foreground/85">TALLEA_ENABLE_AI=true</code>{" "}
+                and provide{" "}
+                <code className="text-foreground/85">AI_GATEWAY_API_KEY</code>{" "}
+                to switch to AI generation.
+              </>
+            ) : (
+              <>
+                <code className="text-foreground/85">AI_GATEWAY_API_KEY</code>{" "}
+                is missing — add it in project settings to enable AI mode.
+              </>
+            )}
           </p>
         ) : (
           <p className="text-[12px] text-muted mt-4 max-w-xl leading-relaxed">
             Running in <span className="text-accent">AI mode</span>. Cycles are
-            generated via the Vercel AI Gateway.
+            generated via the Vercel AI Gateway using model{" "}
+            <code className="text-foreground/85">{modeStatus.model}</code>{" "}
+            (temperature{" "}
+            <span className="tabular">{modeStatus.temperature}</span>). The
+            deterministic publisher still owns timeline, daybook, and the
+            public site projection.
           </p>
         )}
       </section>

@@ -3,6 +3,7 @@ import Link from "next/link";
 const NAV_LINKS = [
   { href: "/pulse", label: "Pulse" },
   { href: "/timeline", label: "Timeline" },
+  { href: "/daybook", label: "Daybook" },
   { href: "/admin", label: "Admin" },
 ];
 

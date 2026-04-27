@@ -3,6 +3,7 @@ import path from "node:path";
 import type {
   CycleOutput,
   TimelineEvent,
+  WorldLogEntry,
   WorldState,
   WorldStateDelta,
 } from "@/types/world";
@@ -19,6 +20,7 @@ export const SEED_DIR = path.join(DATA_DIR, "seed");
 export const CYCLES_DIR = path.join(DATA_DIR, "cycles");
 export const CURRENT_STATE_PATH = path.join(DATA_DIR, "current_state.json");
 export const TIMELINE_PATH = path.join(DATA_DIR, "timeline.json");
+export const LOG_PATH = path.join(DATA_DIR, "log.json");
 export const INITIAL_STATE_PATH = path.join(SEED_DIR, "initial_state.json");
 export const FIRST_CYCLE_SEED_PATH = path.join(SEED_DIR, "first_cycle_seed.md");
 export const RUNTIME_FOUNDATION_PATH = path.join(RUNTIME_DIR, "runtime_foundation.md");
@@ -185,6 +187,14 @@ export async function loadCurrentWorldState(): Promise<WorldState | null> {
 
 export function loadTimeline(): TimelineEvent[] {
   return readJsonFile<TimelineEvent[]>(TIMELINE_PATH) ?? [];
+}
+
+// ---------------------------------------------------------------------------
+// World log / Daybook loader
+// ---------------------------------------------------------------------------
+
+export function loadWorldLog(): WorldLogEntry[] {
+  return readJsonFile<WorldLogEntry[]>(LOG_PATH) ?? [];
 }
 
 // ---------------------------------------------------------------------------

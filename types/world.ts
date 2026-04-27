@@ -279,6 +279,66 @@ export interface CycleOutput {
   next_hooks: string[];
   threads: NarrativeThread[];
   state_updates: WorldStateDelta;
+  /**
+   * Optional finer-grained daily log entries the orchestrator (mock or AI)
+   * can attach to enrich the public daybook beyond the headline timeline.
+   *
+   * The deterministic publishing layer always derives a baseline set of
+   * WorldLogEntries from the cycle (decision, residue, consequences, public
+   * shifts). Anything in `logEntries` here is merged on top so the model
+   * can add color without owning the canonical record.
+   */
+  logEntries?: CycleLogEntryInput[];
+}
+
+// ---------------------------------------------------------------------------
+// World log / Daybook (fuller daily record beyond the highlight timeline)
+//
+// timeline.json   = one TimelineEvent per cycle (the headline)
+// log.json        = many WorldLogEntry per cycle (the daybook)
+// ---------------------------------------------------------------------------
+
+export type WorldLogVisibility = "internal" | "public" | "mixed";
+
+export type WorldLogKind =
+  | "decision"
+  | "conversation"
+  | "merchant_signal"
+  | "product_change"
+  | "trust_signal"
+  | "press_signal"
+  | "internal_shift"
+  | "operational"
+  | "consequence";
+
+export type WorldLogDomain = PendingConsequence["domain"];
+
+/**
+ * A single entry in the world log / daybook.
+ * Persisted append-only in data/log.json.
+ */
+export interface WorldLogEntry {
+  id: string; // `${cycle_id}_log_${idx}` — stable per cycle
+  cycle_id: string;
+  day: number;
+  kind: WorldLogKind;
+  visibility: WorldLogVisibility;
+  summary: string;
+  actors?: string[];
+  domain?: WorldLogDomain;
+  source: "derived" | "model"; // baseline derivation vs orchestrator-attached
+}
+
+/**
+ * Shape the orchestrator (mock or AI) may attach to a CycleOutput.
+ * The publishing layer assigns id/cycle_id/day before persisting.
+ */
+export interface CycleLogEntryInput {
+  kind: WorldLogKind;
+  visibility: WorldLogVisibility;
+  summary: string;
+  actors?: string[];
+  domain?: WorldLogDomain;
 }
 
 // ---------------------------------------------------------------------------

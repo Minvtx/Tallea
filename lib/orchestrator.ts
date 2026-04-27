@@ -8,6 +8,21 @@
  * Mode is selected at runtime by env:
  *   TALLEA_ENABLE_AI=true && AI_GATEWAY_API_KEY=...  -> ai
  *   otherwise                                        -> mock
+ *
+ * AI mode env config:
+ *   AI_GATEWAY_API_KEY        (required)  Vercel AI Gateway key.
+ *   TALLEA_ENABLE_AI=true     (required)  Flips the orchestrator into AI mode.
+ *   TALLEA_AI_MODEL           (optional)  Default: "openai/gpt-5-mini".
+ *                                         Any AI Gateway-routable model id.
+ *   TALLEA_AI_TEMPERATURE     (optional)  Default: "0.7". Float 0..1.
+ *
+ * The model only produces structured CycleOutput. The deterministic
+ * publishing layer (lib/state.ts + lib/publisher.ts + lib/log.ts) is what
+ * actually updates the timeline, the daybook, the public site projection
+ * and the realism guardrails. The model never writes to disk directly.
+ *
+ * Any AI failure cleanly falls back to mock generation so the simulation
+ * never stalls — the cycle just runs on deterministic templates instead.
  */
 
 import type {
@@ -15,6 +30,7 @@ import type {
   PendingConsequence,
   SiteProjection,
   TimelineEvent,
+  WorldLogEntry,
   WorldState,
   WorldStateDelta,
 } from "@/types/world";
@@ -67,14 +83,34 @@ export function buildCycleContext(state: WorldState): CycleContext {
 
 export type CycleMode = "mock" | "ai";
 
+export type CycleModeReason =
+  | "ai_enabled"
+  | "missing_enable_flag"
+  | "missing_gateway_key";
+
+export function getCycleModeStatus(): {
+  mode: CycleMode;
+  reason: CycleModeReason;
+  model: string;
+  temperature: number;
+} {
+  const enabled = process.env.TALLEA_ENABLE_AI === "true";
+  const hasKey = (process.env.AI_GATEWAY_API_KEY ?? "").length > 0;
+  const model = process.env.TALLEA_AI_MODEL || "openai/gpt-5-mini";
+  const temperature = (() => {
+    const raw = process.env.TALLEA_AI_TEMPERATURE;
+    if (!raw) return 0.7;
+    const n = Number.parseFloat(raw);
+    return Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.7;
+  })();
+
+  if (!enabled) return { mode: "mock", reason: "missing_enable_flag", model, temperature };
+  if (!hasKey) return { mode: "mock", reason: "missing_gateway_key", model, temperature };
+  return { mode: "ai", reason: "ai_enabled", model, temperature };
+}
+
 export function getCycleMode(): CycleMode {
-  if (
-    process.env.TALLEA_ENABLE_AI === "true" &&
-    (process.env.AI_GATEWAY_API_KEY ?? "").length > 0
-  ) {
-    return "ai";
-  }
-  return "mock";
+  return getCycleModeStatus().mode;
 }
 
 // ---------------------------------------------------------------------------
@@ -82,9 +118,11 @@ export function getCycleMode(): CycleMode {
 // ---------------------------------------------------------------------------
 
 async function generateWithAI(ctx: CycleContext): Promise<CycleOutput> {
-  // Lazy import so mock mode never pulls in the AI SDK
+  // Lazy import so mock mode never pulls in the AI SDK at all.
   const { generateObject } = await import("ai");
   const { z } = await import("zod");
+
+  const { model, temperature } = getCycleModeStatus();
 
   const ConsequenceSchema = z.object({
     source_event_id: z.string(),
@@ -133,6 +171,34 @@ async function generateWithAI(ctx: CycleContext): Promise<CycleOutput> {
     status: z.enum(["opened", "developing", "resolved", "deferred"]),
   });
 
+  const LogEntrySchema = z.object({
+    kind: z.enum([
+      "decision",
+      "conversation",
+      "merchant_signal",
+      "product_change",
+      "trust_signal",
+      "press_signal",
+      "internal_shift",
+      "operational",
+      "consequence",
+    ]),
+    visibility: z.enum(["internal", "public", "mixed"]),
+    summary: z.string(),
+    actors: z.array(z.string()).optional(),
+    domain: z
+      .enum([
+        "product",
+        "trust",
+        "merchant",
+        "reputation",
+        "runway",
+        "relationship",
+        "strategy",
+      ])
+      .optional(),
+  });
+
   const CycleSchema = z.object({
     cycle_id: z.string(),
     day: z.number(),
@@ -148,6 +214,7 @@ async function generateWithAI(ctx: CycleContext): Promise<CycleOutput> {
     next_hooks: z.array(z.string()),
     threads: z.array(ThreadSchema),
     state_updates: DeltaSchema,
+    logEntries: z.array(LogEntrySchema).optional(),
   });
 
   const day = ctx.state.world.day + 1;
@@ -167,9 +234,28 @@ async function generateWithAI(ctx: CycleContext): Promise<CycleOutput> {
     pending_consequences: ctx.state.pending_consequences,
   };
 
-  const prompt = [
+  const system = [
     "You are the orchestrator for a persistent simulated startup world named Tallea.",
-    "Generate the next cycle as a CycleOutput object that conforms to the schema.",
+    "Tallea is a five-person Buenos Aires fit-intelligence company with finite runway.",
+    "You generate exactly one cycle (one in-universe day) as a structured CycleOutput.",
+    "",
+    "Hard rules:",
+    "- Output only the structured object the schema requires. No prose outside the object.",
+    "- The deterministic publishing layer in this app applies your delta, clamps single-cycle jumps to one step on key ladders, persists the timeline, and derives the public site. You do not write to disk; you emit a cycle.",
+    "- Honor canonical realism: most cycles advance a thread rather than concluding one; public narrative lags internal state; pressure usually accumulates rather than resolves; a signal is more honest than a result.",
+    "- Forbidden single-cycle moves unless the recent timeline explicitly built up to them: instant signed paid pilots, public_legitimacy jumps of more than one step, runway_pressure jumps of more than one step, internal_alignment jumps of more than one step, press explosions, acquisition rumors, large fundraising, full repair of openly-strained relationships.",
+    "- The state_updates delta must touch at least one character and at least one strategic field. Add at least one pending_consequence unless none would be honest.",
+    "",
+    "About logEntries (the daybook layer):",
+    "- The app already stores a one-line-per-cycle highlight timeline. logEntries is a complementary fuller daily record.",
+    "- Provide between 2 and 6 logEntries giving granular beats that did not make it into the headline title/trigger/outcome/residue but happened today.",
+    "- Use visibility=public only for things visible on the homepage or in press. Use visibility=mixed for merchant-facing signals. Default to internal.",
+    "- Keep each summary to one or two sentences. No raw JSON, no debug language. Readable, like a quiet company log.",
+    "- Do NOT restate the title, trigger, decision, outcome or residue verbatim. The publisher already derives baseline log entries from those fields and dedupes against your contributions.",
+  ].join("\n");
+
+  const userPrompt = [
+    `## Cycle to generate: ${cycleId} (day ${day})`,
     "",
     "## Runtime Foundation",
     ctx.runtimeFoundation,
@@ -186,8 +272,6 @@ async function generateWithAI(ctx: CycleContext): Promise<CycleOutput> {
     "## State Schema",
     ctx.stateSchema,
     "",
-    `## Cycle ID: ${cycleId} (day ${day})`,
-    "",
     "## Current World State (compact)",
     JSON.stringify(compactState, null, 2),
     "",
@@ -197,25 +281,34 @@ async function generateWithAI(ctx: CycleContext): Promise<CycleOutput> {
       ? "\n## Day 0 Seed (use this for the first cycle)\n" + ctx.firstCycleSeed
       : "",
     "",
-    "## Scale and Pacing Constraints (must be honored)",
-    "- One cycle equals one in-universe day at a five-person Buenos Aires apparel-fit startup with finite runway and a small early network.",
-    "- Most cycles should advance a thread, not conclude one.",
-    "- Public narrative lags internal state. A single conversation, recommendation, or mention should not push public_legitimacy more than one step.",
-    "- Big outcomes require buildup. A signed pilot follows pilot conversations. A press explosion follows a smaller mention. A platform deal follows an inquiry.",
-    "- Pressure usually accumulates rather than resolves. Most cycles should leave at least one tension worse than they found it.",
-    "- Forbidden single-cycle moves unless the recent timeline explicitly built up to them: instant signed paid pilots, public_legitimacy jumps of more than one step, runway_pressure jumps of more than one step, internal_alignment jumps of more than one step, press explosions, acquisition rumors, large fundraising, full repair of openly-strained relationships.",
-    "- When in doubt, prefer the smaller, more constrained version of the event. A signal is more honest than a result.",
-    "- Before finalizing the cycle, ask yourself: could this realistically happen in one day given Tallea's current size, runway, network, and stage? What is still only a signal, not a result? What changed internally even though the public site should not change yet?",
-    "",
-    "Generate exactly one cycle. The state_updates delta must touch at least one character and at least one strategic field. Add at least one pending_consequence unless none would be honest. Do not move any qualitative ladder by more than one step in a single cycle. The deterministic apply layer will clamp larger jumps anyway, so producing them only wastes the cycle.",
+    "Generate exactly one cycle now.",
   ].join("\n");
 
-  const result = await generateObject({
-    model: "openai/gpt-5-mini",
-    schema: CycleSchema,
-    prompt,
-  });
+  const startedAt = Date.now();
+  let result;
+  try {
+    result = await generateObject({
+      model,
+      schema: CycleSchema,
+      system,
+      prompt: userPrompt,
+      temperature,
+    });
+  } catch (err) {
+    const elapsed = Date.now() - startedAt;
+    console.error(
+      `[orchestrator:ai] generateObject failed model=${model} after ${elapsed}ms`,
+      err,
+    );
+    throw err;
+  }
+  const elapsed = Date.now() - startedAt;
+  console.log(
+    `[orchestrator:ai] generated cycle=${cycleId} day=${day} model=${model} temp=${temperature} in ${elapsed}ms`,
+  );
 
+  // The model proposes cycle_id and day, but the orchestrator owns them.
+  // We override to avoid drift between generation and persistence.
   return {
     ...(result.object as CycleOutput),
     cycle_id: cycleId,
@@ -811,6 +904,7 @@ export interface RunCycleResult {
   cycleOutput: CycleOutput;
   nextState: WorldState;
   timelineEvent: TimelineEvent;
+  logEntries: WorldLogEntry[];
   projection: SiteProjection;
   mode: CycleMode;
 }
@@ -818,6 +912,10 @@ export interface RunCycleResult {
 /**
  * Run a single cycle: load state, generate, persist, project. Single entry
  * point for /admin and the cron route.
+ *
+ * Generation is the only step where the AI model is involved; everything
+ * downstream (delta application, realism clamps, timeline, daybook,
+ * projection) is deterministic.
  */
 export async function runWorldCycle(): Promise<RunCycleResult> {
   let state = await loadCurrentWorldState();
@@ -831,13 +929,17 @@ export async function runWorldCycle(): Promise<RunCycleResult> {
   const ctx = buildCycleContext(state);
   const cycleOutput = await generateCycleOutput(ctx);
   writeCycleOutput(cycleOutput);
-  const { nextState, timelineEvent } = applyAndPersistCycle(state, cycleOutput);
+  const { nextState, timelineEvent, logEntries } = applyAndPersistCycle(
+    state,
+    cycleOutput,
+  );
   const projection = deriveProjection(nextState);
 
   return {
     cycleOutput,
     nextState,
     timelineEvent,
+    logEntries,
     projection,
     mode: getCycleMode(),
   };

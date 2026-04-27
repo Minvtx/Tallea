@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { runWorldCycle } from "@/lib/orchestrator";
+import { getCycleModeStatus, runWorldCycle } from "@/lib/orchestrator";
 
 /**
  * Vercel Cron entry point.
@@ -33,13 +33,17 @@ export async function GET(req: Request) {
 
   try {
     const result = await runWorldCycle();
+    const status = getCycleModeStatus();
     return NextResponse.json({
       ok: true,
       cycle_id: result.cycleOutput.cycle_id,
       day: result.cycleOutput.day,
       title: result.cycleOutput.title,
       timeline_cycle_id: result.timelineEvent.cycle_id,
-      mode: process.env.TALLEA_ENABLE_AI === "true" ? "ai" : "mock",
+      log_entries: result.logEntries.length,
+      mode: result.mode,
+      mode_reason: status.reason,
+      ...(result.mode === "ai" ? { model: status.model } : {}),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "unknown error";

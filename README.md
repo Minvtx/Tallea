@@ -16,15 +16,17 @@ data/
   seed/         Day-0 snapshot (initial_state.json + first_cycle_seed.md)
   cycles/       Generated cycle outputs (cycle_NNN_output.json)
   current_state.json   Latest applied world state (regenerated)
-  timeline.json        Append-only event log
+  timeline.json        Append-only headline log (one entry per cycle)
+  log.json             Append-only daybook log (many entries per cycle)
 
-types/world.ts          Strongly typed world model + WorldStateDelta
+types/world.ts          Strongly typed world model + WorldStateDelta + WorldLogEntry
 lib/loaders.ts          Reads + deep-merges state from cycles + seed
 lib/state.ts            writeCycleOutput, applyAndPersistCycle, resetWorldState
 lib/publisher.ts        deriveProjection — maps state to public site claims
+lib/log.ts              deriveBaselineLogEntries / mergeCycleLogEntries — daybook
 lib/orchestrator.ts     buildCycleContext, generateCycleOutput, runWorldCycle
 
-app/                    /, /pulse, /timeline, /admin, /api/cron/run-cycle
+app/                    /, /pulse, /timeline, /daybook, /admin, /api/cron/run-cycle
 components/             Editorial UI primitives (status-badge, section-card, ...)
 ```
 
@@ -37,9 +39,21 @@ Cycles never mutate canon. Each cycle produces a `CycleOutput` containing a
 
 - `/` — public-facing facade for Tallea (hero, dispatch, proof points, claims).
 - `/pulse` — internal-feel daily briefing for the current day.
-- `/timeline` — archival view of every cycle event in order.
+- `/timeline` — one headline per cycle, reverse-chronological.
+- `/daybook` — fuller daily record with internal/public/mixed visibility filter.
 - `/admin` — operator console: run next cycle, run 3 cycles, reset to seed.
 - `/api/cron/run-cycle` — Vercel Cron entry point; calls `runWorldCycle()`.
+
+### Timeline vs daybook
+
+- **Timeline** is the canonical highlight. One `TimelineEvent` per cycle —
+  trigger, outcome, residue, what carries forward.
+- **Daybook** is the granular log. Multiple `WorldLogEntry`s per cycle,
+  each tagged `internal` / `public` / `mixed` and a `kind`
+  (`decision`, `merchant_signal`, `press_signal`, `internal_shift`, …).
+  Baseline entries are derived deterministically from the cycle output;
+  the orchestrator (mock or AI) may attach extra `logEntries` to enrich it
+  without a second LLM call.
 
 ---
 
@@ -57,20 +71,34 @@ The orchestrator has two modes; selection is automatic at runtime.
 - Enabled when **both** `TALLEA_ENABLE_AI=true` and `AI_GATEWAY_API_KEY` are set.
 - Uses AI SDK 6 + Vercel AI Gateway with structured output (`generateObject` +
   Zod schema for `CycleOutput`).
+- The model only produces a structured `CycleOutput`; everything else
+  (delta application, realism clamps, timeline append, daybook derivation,
+  public site projection) stays deterministic in `lib/state.ts`,
+  `lib/log.ts`, and `lib/publisher.ts`. The model never writes to disk.
 - Default model: `openai/gpt-5-mini` (zero-config through the gateway).
+- Any AI failure (timeout, schema reject, network) is logged and falls back
+  to mock generation for that cycle — the simulation never stalls.
 
 ---
 
 ## Environment variables
 
-| Variable | Required | Purpose |
-|---|---|---|
-| `AI_GATEWAY_API_KEY` | for AI mode | Vercel AI Gateway key |
-| `TALLEA_ENABLE_AI` | for AI mode | Set to `"true"` to flip mode |
-| `CRON_SECRET` | production | Bearer token Vercel Cron sends; the cron route rejects mismatches |
+| Variable | Required | Default | Purpose |
+|---|---|---|---|
+| `AI_GATEWAY_API_KEY` | for AI mode | — | Vercel AI Gateway key. |
+| `TALLEA_ENABLE_AI` | for AI mode | — | Set to `"true"` to flip into AI mode. |
+| `TALLEA_AI_MODEL` | optional | `openai/gpt-5-mini` | Any AI Gateway-routable model id. |
+| `TALLEA_AI_TEMPERATURE` | optional | `0.7` | Float in `[0, 1]`. |
+| `CRON_SECRET` | production | — | Bearer token Vercel Cron sends; the cron route rejects mismatches. |
+
+Recommended models on the Vercel AI Gateway (zero-config):
+`openai/gpt-5-mini`, `openai/gpt-5`, `anthropic/claude-opus-4.6`,
+`google/gemini-3-flash`. Other providers (xAI, Groq, etc.) require
+`AI_GATEWAY_API_KEY` to be set on the project.
 
 Local development without any env vars runs in mock mode against the file
-system (`data/cycles/`, `data/timeline.json`, `data/current_state.json`).
+system (`data/cycles/`, `data/timeline.json`, `data/log.json`,
+`data/current_state.json`).
 
 ---
 
