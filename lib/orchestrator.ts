@@ -28,6 +28,7 @@
  */
 
 import type {
+  CycleLogEntryInput,
   CycleOutput,
   GenerationMetadata,
   GenerationProvider,
@@ -38,6 +39,7 @@ import type {
   WorldState,
   WorldStateDelta,
 } from "@/types/world";
+import type * as zod from "zod";
 import {
   loadCurrentWorldState,
   loadCycleRules,
@@ -202,31 +204,118 @@ async function generateWithAI(ctx: CycleContext): Promise<CycleOutput> {
       "relationship",
       "strategy",
     ]),
-    activation_condition: z.string().optional(),
+    activation_condition: z.string().nullable(),
     status: z.enum(["pending", "activated", "resolved", "transformed"]),
   });
 
+  const CompanyStateDeltaSchema = z.object({
+    company_name: z.string().nullable(),
+    category: z.string().nullable(),
+    public_promise: z.string().nullable(),
+    initial_wedge: z.string().nullable(),
+    strategic_identity: z.string().nullable(),
+    runway_pressure: z
+      .enum(["low", "medium", "medium_high", "high", "critical"])
+      .nullable(),
+    public_legitimacy: z
+      .enum(["cold", "fragile_warm", "rising", "overexposed", "damaged"])
+      .nullable(),
+    internal_alignment: z
+      .enum(["aligned", "functional_but_split", "openly_split", "fractured"])
+      .nullable(),
+    merchant_dependence: z.enum(["low", "medium", "high"]).nullable(),
+    user_trust_position: z
+      .enum(["untested", "fragile", "improving", "strained", "damaged"])
+      .nullable(),
+  });
+
+  const ProductStateDeltaSchema = z.object({
+    health: z.string().nullable(),
+    reliable_capabilities: z.array(z.string()),
+    inconsistent_capabilities: z.array(z.string()),
+    unsupported_claims: z.array(z.string()),
+    manual_cleanup_burden: z
+      .enum(["low", "medium", "high", "unsustainable"])
+      .nullable(),
+    catalog_readiness: z.enum(["poor", "uneven", "acceptable", "strong"]).nullable(),
+    profile_completion: z.enum(["low", "uneven", "improving", "strong"]).nullable(),
+    confidence_accuracy_updates: z.array(
+      z.object({
+        category: z.string(),
+        confidence: z.string().nullable(),
+      }),
+    ),
+  });
+
+  const UserBetaDeltaSchema = z.object({
+    status: z.string().nullable(),
+    curiosity: z.string().nullable(),
+    completion: z.string().nullable(),
+    main_blocker: z.string().nullable(),
+  });
+
+  const MerchantPipelineDeltaSchema = z.object({
+    status: z.string().nullable(),
+    active_pilot_conversations: z.number().nullable(),
+    white_label_inquiry: z.boolean().nullable(),
+    dominant_pressure: z.string().nullable(),
+  });
+
+  const EcosystemSignalDeltaSchema = z.object({
+    status: z.string().nullable(),
+    source: z.string().nullable(),
+    risk: z.string().nullable(),
+  });
+
+  const PublicLayerDeltaSchema = z.object({
+    website_positioning: z.string().nullable(),
+    allowed_claim_style: z.string().nullable(),
+    forbidden_claims: z.array(z.string()),
+    category_interpretation: z.string().nullable(),
+    misinterpretation_risk: z.string().nullable(),
+  });
+
+  const ExternalEntityUpdateSchema = z.object({
+    id: z.string(),
+    type: z.string().nullable(),
+    status: z.string().nullable(),
+    pressure: z.string().nullable(),
+  });
+
+  const CharacterUpdateSchema = z.object({
+    id: z.string(),
+    role: z.string().nullable(),
+    confidence: z.string().nullable(),
+    stress: z.string().nullable(),
+    influence: z.string().nullable(),
+    alignment: z.string().nullable(),
+    trust_condition: z.string().nullable(),
+    visibility: z.string().nullable(),
+    hidden_pressure: z.string().nullable(),
+    destabilizer: z.string().nullable(),
+    last_major_shift: z.string().nullable(),
+  });
+
+  const RelationshipUpdateSchema = z.object({
+    pair: z.string(),
+    value: z.string(),
+  });
+
   const DeltaSchema = z.object({
-    company_state: z.record(z.string(), z.unknown()).optional(),
-    product_state: z.record(z.string(), z.unknown()).optional(),
-    traction_state: z
-      .object({
-        user_beta: z.record(z.string(), z.unknown()).optional(),
-        merchant_pipeline: z.record(z.string(), z.unknown()).optional(),
-        ecosystem_signal: z.record(z.string(), z.unknown()).optional(),
-      })
-      .optional(),
-    public_layer: z.record(z.string(), z.unknown()).optional(),
-    external_entities: z
-      .record(z.string(), z.record(z.string(), z.unknown()))
-      .optional(),
-    character_states: z
-      .record(z.string(), z.record(z.string(), z.unknown()))
-      .optional(),
-    relationship_state: z.record(z.string(), z.string()).optional(),
-    open_tensions_added: z.array(z.string()).optional(),
-    open_tensions_removed: z.array(z.string()).optional(),
-    pending_consequences_added: z.array(ConsequenceSchema).optional(),
+    company_state: CompanyStateDeltaSchema,
+    product_state: ProductStateDeltaSchema,
+    traction_state: z.object({
+      user_beta: UserBetaDeltaSchema,
+      merchant_pipeline: MerchantPipelineDeltaSchema,
+      ecosystem_signal: EcosystemSignalDeltaSchema,
+    }),
+    public_layer: PublicLayerDeltaSchema,
+    external_entity_updates: z.array(ExternalEntityUpdateSchema),
+    character_updates: z.array(CharacterUpdateSchema),
+    relationship_updates: z.array(RelationshipUpdateSchema),
+    open_tensions_added: z.array(z.string()),
+    open_tensions_removed: z.array(z.string()),
+    pending_consequences_added: z.array(ConsequenceSchema),
   });
 
   const ThreadSchema = z.object({
@@ -256,7 +345,7 @@ async function generateWithAI(ctx: CycleContext): Promise<CycleOutput> {
     layer: z.enum(["company", "around", "ecosystem", "carry_forward"]),
     visibility: z.enum(["internal", "public", "mixed"]),
     summary: z.string(),
-    actors: z.array(z.string()).optional(),
+    actors: z.array(z.string()),
     domain: z
       .enum([
         "product",
@@ -267,7 +356,7 @@ async function generateWithAI(ctx: CycleContext): Promise<CycleOutput> {
         "relationship",
         "strategy",
       ])
-      .optional(),
+      .nullable(),
   });
 
   const CycleSchema = z.object({
@@ -285,8 +374,134 @@ async function generateWithAI(ctx: CycleContext): Promise<CycleOutput> {
     next_hooks: z.array(z.string()),
     threads: z.array(ThreadSchema),
     state_updates: DeltaSchema,
-    logEntries: z.array(LogEntrySchema).optional(),
+    logEntries: z.array(LogEntrySchema),
   });
+
+  type AICycleOutput = zod.infer<typeof CycleSchema>;
+
+  function isEmptyArray(value: unknown): boolean {
+    return Array.isArray(value) && value.length === 0;
+  }
+
+  function prunePatch<T extends Record<string, unknown>>(
+    value: T,
+  ): Partial<T> | undefined {
+    const entries = Object.entries(value).filter(
+      ([, v]) => v !== null && v !== undefined && !isEmptyArray(v),
+    );
+    if (entries.length === 0) return undefined;
+    return Object.fromEntries(entries) as Partial<T>;
+  }
+
+  function nonEmptyArray<T>(items: T[]): T[] | undefined {
+    return items.length > 0 ? items : undefined;
+  }
+
+  function normalizeConsequences(
+    consequences: AICycleOutput["state_updates"]["pending_consequences_added"],
+  ): PendingConsequence[] | undefined {
+    const normalized = consequences.map(
+      ({ activation_condition: activationCondition, ...consequence }) =>
+        activationCondition
+          ? { ...consequence, activation_condition: activationCondition }
+          : consequence,
+    );
+    return nonEmptyArray(normalized);
+  }
+
+  function normalizeLogEntries(
+    entries: AICycleOutput["logEntries"],
+  ): CycleLogEntryInput[] | undefined {
+    return nonEmptyArray(
+      entries.map(({ domain, ...entry }) =>
+        domain ? { ...entry, domain } : entry,
+      ),
+    );
+  }
+
+  function normalizeAICycleOutput(cycle: AICycleOutput): CycleOutput {
+    const stateUpdates = cycle.state_updates;
+    const productState = stateUpdates.product_state;
+    const {
+      confidence_accuracy_updates: confidenceUpdates,
+      ...productPatch
+    } = productState;
+    const confidenceAccuracyByCategory = Object.fromEntries(
+      confidenceUpdates
+        .filter((update) => update.category.trim() && update.confidence !== null)
+        .map((update) => [update.category, update.confidence]),
+    );
+    const normalizedProductState = prunePatch({
+      ...productPatch,
+      confidence_accuracy_by_category:
+        Object.keys(confidenceAccuracyByCategory).length > 0
+          ? confidenceAccuracyByCategory
+          : undefined,
+    }) as WorldStateDelta["product_state"];
+
+    const userBeta = prunePatch(stateUpdates.traction_state.user_beta);
+    const merchantPipeline = prunePatch(
+      stateUpdates.traction_state.merchant_pipeline,
+    );
+    const ecosystemSignal = prunePatch(
+      stateUpdates.traction_state.ecosystem_signal,
+    );
+    const normalizedTractionState = prunePatch({
+      user_beta: userBeta,
+      merchant_pipeline: merchantPipeline,
+      ecosystem_signal: ecosystemSignal,
+    }) as WorldStateDelta["traction_state"];
+
+    const externalEntities = Object.fromEntries(
+      stateUpdates.external_entity_updates.flatMap(({ id, ...patch }) => {
+        const normalized = prunePatch(patch);
+        return id.trim() && normalized ? [[id, normalized]] : [];
+      }),
+    );
+    const characterStates = Object.fromEntries(
+      stateUpdates.character_updates.flatMap(({ id, ...patch }) => {
+        const normalized = prunePatch(patch);
+        return id.trim() && normalized ? [[id, normalized]] : [];
+      }),
+    );
+    const relationshipState = Object.fromEntries(
+      stateUpdates.relationship_updates
+        .filter(({ pair }) => pair.trim())
+        .map(({ pair, value }) => [pair, value]),
+    );
+
+    return {
+      ...cycle,
+      logEntries: normalizeLogEntries(cycle.logEntries),
+      state_updates: {
+        company_state: prunePatch(
+          stateUpdates.company_state,
+        ) as WorldStateDelta["company_state"],
+        product_state: normalizedProductState,
+        traction_state: normalizedTractionState,
+        public_layer: prunePatch(
+          stateUpdates.public_layer,
+        ) as WorldStateDelta["public_layer"],
+        external_entities:
+          Object.keys(externalEntities).length > 0
+            ? (externalEntities as WorldStateDelta["external_entities"])
+            : undefined,
+        character_states:
+          Object.keys(characterStates).length > 0
+            ? (characterStates as WorldStateDelta["character_states"])
+            : undefined,
+        relationship_state:
+          Object.keys(relationshipState).length > 0
+            ? relationshipState
+            : undefined,
+        open_tensions_added: nonEmptyArray(stateUpdates.open_tensions_added),
+        open_tensions_removed: nonEmptyArray(stateUpdates.open_tensions_removed),
+        pending_consequences_added: normalizeConsequences(
+          stateUpdates.pending_consequences_added,
+        ),
+      },
+    };
+  }
 
   const day = ctx.state.world.day + 1;
   const cycleId = `cycle_${String(day).padStart(3, "0")}`;
@@ -316,6 +531,9 @@ async function generateWithAI(ctx: CycleContext): Promise<CycleOutput> {
     "- Honor canonical realism: most cycles advance a thread rather than concluding one; public narrative lags internal state; pressure usually accumulates rather than resolves; a signal is more honest than a result.",
     "- Forbidden single-cycle moves unless the recent timeline explicitly built up to them: instant signed paid pilots, public_legitimacy jumps of more than one step, runway_pressure jumps of more than one step, internal_alignment jumps of more than one step, press explosions, acquisition rumors, large fundraising, full repair of openly-strained relationships.",
     "- The state_updates delta must touch at least one character and at least one strategic field. Add at least one pending_consequence unless none would be honest.",
+    "- The schema uses required nullable patch fields for strict structured output. Emit every nullable patch field as either a concrete value or null. Use null when a field is unchanged.",
+    "- Use empty arrays when there are no updates for an array field. Dynamic keyed updates must be arrays: external_entity_updates, character_updates, relationship_updates, and confidence_accuracy_updates. Do not emit object/map-shaped dynamic updates.",
+    "- The runtime normalizes nulls, empty arrays, and empty patch objects away before applying the deterministic state delta.",
     "",
     "Distinctiveness — important:",
     "- The runtime contains a small set of canonical mock-mode templates used when AI generation is disabled. When YOU are generating, your output must be visibly distinguishable from those templates. Do NOT reuse any of these exact mock-mode titles verbatim:",
@@ -401,7 +619,7 @@ async function generateWithAI(ctx: CycleContext): Promise<CycleOutput> {
   // The model proposes cycle_id and day, but the orchestrator owns them.
   // We override to avoid drift between generation and persistence.
   return {
-    ...(result.object as CycleOutput),
+    ...normalizeAICycleOutput(result.object as AICycleOutput),
     cycle_id: cycleId,
     day,
   };
