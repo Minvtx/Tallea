@@ -68,14 +68,16 @@ The orchestrator has two modes; selection is automatic at runtime.
   `data/seed/first_cycle_seed.md`.
 
 ### AI mode
-- Enabled when **both** `TALLEA_ENABLE_AI=true` and `AI_GATEWAY_API_KEY` are set.
-- Uses AI SDK 6 + Vercel AI Gateway with structured output (`generateObject` +
-  Zod schema for `CycleOutput`).
+- Enabled when **both** `TALLEA_ENABLE_AI=true` and `OPENAI_API_KEY` are set.
+- Uses AI SDK 6 + the `@ai-sdk/openai` provider with structured output
+  (`generateObject` + Zod schema for `CycleOutput`).
 - The model only produces a structured `CycleOutput`; everything else
   (delta application, realism clamps, timeline append, daybook derivation,
   public site projection) stays deterministic in `lib/state.ts`,
   `lib/log.ts`, and `lib/publisher.ts`. The model never writes to disk.
-- Default model: `openai/gpt-5-mini` (zero-config through the gateway).
+- Default model: `gpt-4o-mini` — broadly available, structured-output capable,
+  cheap. Override with `TALLEA_AI_MODEL` (e.g. `gpt-4o`, `gpt-5-mini` if your
+  account has access).
 - Any AI failure (timeout, schema reject, network) is logged and falls back
   to mock generation for that cycle — the simulation never stalls.
 
@@ -85,16 +87,11 @@ The orchestrator has two modes; selection is automatic at runtime.
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
-| `AI_GATEWAY_API_KEY` | for AI mode | — | Vercel AI Gateway key. |
+| `OPENAI_API_KEY` | for AI mode | — | OpenAI API key (`sk-...`). Billed against your OpenAI account. |
 | `TALLEA_ENABLE_AI` | for AI mode | — | Set to `"true"` to flip into AI mode. |
-| `TALLEA_AI_MODEL` | optional | `openai/gpt-5-mini` | Any AI Gateway-routable model id. |
+| `TALLEA_AI_MODEL` | optional | `gpt-4o-mini` | Any OpenAI-hosted model id available to the account. |
 | `TALLEA_AI_TEMPERATURE` | optional | `0.7` | Float in `[0, 1]`. |
 | `CRON_SECRET` | production | — | Bearer token Vercel Cron sends; the cron route rejects mismatches. |
-
-Recommended models on the Vercel AI Gateway (zero-config):
-`openai/gpt-5-mini`, `openai/gpt-5`, `anthropic/claude-opus-4.6`,
-`google/gemini-3-flash`. Other providers (xAI, Groq, etc.) require
-`AI_GATEWAY_API_KEY` to be set on the project.
 
 Local development without any env vars runs in mock mode against the file
 system (`data/cycles/`, `data/timeline.json`, `data/log.json`,
@@ -117,7 +114,7 @@ Click **Reset to seed** at any point to restore the initial state.
 ## Deploying with cron
 
 1. Push this repo to Vercel.
-2. Set `CRON_SECRET` (and optionally `AI_GATEWAY_API_KEY` + `TALLEA_ENABLE_AI`).
+2. Set `CRON_SECRET` (and optionally `OPENAI_API_KEY` + `TALLEA_ENABLE_AI`).
 3. The schedule in `vercel.json` runs `/api/cron/run-cycle` daily at 14:00 UTC.
 
 To change the schedule, edit `vercel.json`:

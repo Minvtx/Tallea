@@ -3,17 +3,19 @@
  *
  * Two modes:
  *  - mock (default): deterministic event templates driven by current state.
- *  - ai: AI SDK 6 + Vercel AI Gateway + structured output (see generateWithAI).
+ *  - ai: AI SDK 6 + OpenAI provider + structured output (see generateWithAI).
  *
  * Mode is selected at runtime by env:
- *   TALLEA_ENABLE_AI=true && AI_GATEWAY_API_KEY=...  -> ai
- *   otherwise                                        -> mock
+ *   TALLEA_ENABLE_AI=true && OPENAI_API_KEY=...  -> ai
+ *   otherwise                                    -> mock
  *
  * AI mode env config:
- *   AI_GATEWAY_API_KEY        (required)  Vercel AI Gateway key.
+ *   OPENAI_API_KEY            (required)  OpenAI API key (sk-...).
  *   TALLEA_ENABLE_AI=true     (required)  Flips the orchestrator into AI mode.
- *   TALLEA_AI_MODEL           (optional)  Default: "openai/gpt-5-mini".
- *                                         Any AI Gateway-routable model id.
+ *   TALLEA_AI_MODEL           (optional)  Default: "gpt-4o-mini".
+ *                                         Any OpenAI-hosted model id available
+ *                                         to the account (e.g. "gpt-4o-mini",
+ *                                         "gpt-4o", "gpt-5-mini" if granted).
  *   TALLEA_AI_TEMPERATURE     (optional)  Default: "0.7". Float 0..1.
  *
  * The model only produces structured CycleOutput. The deterministic
@@ -86,7 +88,7 @@ export type CycleMode = "mock" | "ai";
 export type CycleModeReason =
   | "ai_enabled"
   | "missing_enable_flag"
-  | "missing_gateway_key";
+  | "missing_openai_key";
 
 export function getCycleModeStatus(): {
   mode: CycleMode;
@@ -95,8 +97,8 @@ export function getCycleModeStatus(): {
   temperature: number;
 } {
   const enabled = process.env.TALLEA_ENABLE_AI === "true";
-  const hasKey = (process.env.AI_GATEWAY_API_KEY ?? "").length > 0;
-  const model = process.env.TALLEA_AI_MODEL || "openai/gpt-5-mini";
+  const hasKey = (process.env.OPENAI_API_KEY ?? "").length > 0;
+  const model = process.env.TALLEA_AI_MODEL || "gpt-4o-mini";
   const temperature = (() => {
     const raw = process.env.TALLEA_AI_TEMPERATURE;
     if (!raw) return 0.7;
@@ -105,7 +107,7 @@ export function getCycleModeStatus(): {
   })();
 
   if (!enabled) return { mode: "mock", reason: "missing_enable_flag", model, temperature };
-  if (!hasKey) return { mode: "mock", reason: "missing_gateway_key", model, temperature };
+  if (!hasKey) return { mode: "mock", reason: "missing_openai_key", model, temperature };
   return { mode: "ai", reason: "ai_enabled", model, temperature };
 }
 
@@ -118,8 +120,9 @@ export function getCycleMode(): CycleMode {
 // ---------------------------------------------------------------------------
 
 async function generateWithAI(ctx: CycleContext): Promise<CycleOutput> {
-  // Lazy import so mock mode never pulls in the AI SDK at all.
+  // Lazy imports so mock mode never pulls in the AI SDK at all.
   const { generateObject } = await import("ai");
+  const { openai } = await import("@ai-sdk/openai");
   const { z } = await import("zod");
 
   const { model, temperature } = getCycleModeStatus();
@@ -301,7 +304,7 @@ async function generateWithAI(ctx: CycleContext): Promise<CycleOutput> {
   let result;
   try {
     result = await generateObject({
-      model,
+      model: openai(model),
       schema: CycleSchema,
       system,
       prompt: userPrompt,

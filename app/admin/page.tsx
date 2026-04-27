@@ -87,12 +87,12 @@ export default async function AdminPage() {
                 Set{" "}
                 <code className="text-foreground/85">TALLEA_ENABLE_AI=true</code>{" "}
                 and provide{" "}
-                <code className="text-foreground/85">AI_GATEWAY_API_KEY</code>{" "}
+                <code className="text-foreground/85">OPENAI_API_KEY</code>{" "}
                 to switch to AI generation.
               </>
             ) : (
               <>
-                <code className="text-foreground/85">AI_GATEWAY_API_KEY</code>{" "}
+                <code className="text-foreground/85">OPENAI_API_KEY</code>{" "}
                 is missing — add it in project settings to enable AI mode.
               </>
             )}
@@ -100,7 +100,7 @@ export default async function AdminPage() {
         ) : (
           <p className="text-[12px] text-muted mt-4 max-w-xl leading-relaxed">
             Running in <span className="text-accent">AI mode</span>. Cycles are
-            generated via the Vercel AI Gateway using model{" "}
+            generated via the OpenAI API using model{" "}
             <code className="text-foreground/85">{modeStatus.model}</code>{" "}
             (temperature{" "}
             <span className="tabular">{modeStatus.temperature}</span>). The
