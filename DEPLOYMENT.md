@@ -31,6 +31,9 @@ CRON_SECRET=...
 ADMIN_SECRET=...
 ```
 
+`ADMIN_SECRET` is required in production. If it is missing, `/admin` and admin
+actions are blocked instead of being left open.
+
 Keep `OPENAI_API_KEY` only if you want the direct OpenAI fallback path available
 with `TALLEA_AI_PROVIDER=openai`.
 

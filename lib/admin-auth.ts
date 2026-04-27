@@ -3,6 +3,10 @@ import { redirect } from "next/navigation";
 
 const ADMIN_COOKIE_NAME = "tallea_admin_secret";
 
+function isProduction(): boolean {
+  return process.env.VERCEL_ENV === "production";
+}
+
 export function isAdminSecretConfigured(): boolean {
   return (process.env.ADMIN_SECRET ?? "").length > 0;
 }
@@ -17,9 +21,9 @@ export async function getAdminAccessStatus(
   const secret = process.env.ADMIN_SECRET;
   if (!secret) {
     return {
-      authorized: true,
+      authorized: !isProduction(),
       protected: false,
-      unprotectedWarning: process.env.VERCEL_ENV === "production",
+      unprotectedWarning: !isProduction(),
     };
   }
 
@@ -50,7 +54,9 @@ export async function requireAdminAccess(): Promise<void> {
   const status = await getAdminAccessStatus();
   if (!status.authorized) {
     throw new Error(
-      "Unauthorized admin action. Provide ?admin_secret=... once to set the admin cookie, or send x-admin-secret.",
+      isProduction() && !isAdminSecretConfigured()
+        ? "Unauthorized admin action. ADMIN_SECRET must be configured in production."
+        : "Unauthorized admin action. Provide ?admin_secret=... once to set the admin cookie, or send x-admin-secret.",
     );
   }
 }

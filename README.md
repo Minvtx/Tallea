@@ -202,6 +202,7 @@ Click **Reset to seed** at any point to restore the initial state.
 4. Confirm Neon provides `DATABASE_URL` or `POSTGRES_URL`.
 5. Open `/admin?admin_secret=...` once, verify the agent health panel, then use
    `/admin` normally with the cookie.
+   `ADMIN_SECRET` is required in production; without it, `/admin` is blocked.
 6. Smoke-test the cron endpoint with `Authorization: Bearer ${CRON_SECRET}`.
 7. After the first cron-triggered run, inspect Vercel Observability / Workflow
    runs for the run id, step logs, retries, and timing.
